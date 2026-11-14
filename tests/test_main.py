@@ -554,6 +554,9 @@ def test_extract_page_text_skips_ocr_for_native_text():
         def get_images(self, full=True):
             return []
 
+        def get_drawings(self):
+            return []
+
         def get_textpage_ocr(self, **kwargs):
             raise AssertionError("OCR should not run for a normal text-based page.")
 
