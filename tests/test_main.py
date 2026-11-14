@@ -794,7 +794,7 @@ def test_native_table_adapter_preserves_multiline_and_estimates_merged_spans():
             self.cells = cells
 
     class FakeHeader:
-        names = ["Description", "Amount"]
+        names = ["Category", "Description", "Amount"]
         external = False
 
     class FakeTable:
@@ -802,29 +802,29 @@ def test_native_table_adapter_preserves_multiline_and_estimates_merged_spans():
         bbox = (10, 10, 150, 70)
         header = FakeHeader()
         cells = [
-            (10, 10, 100, 40), None, (100, 10, 150, 40),
-            (10, 40, 50, 70), (50, 40, 100, 70), (100, 40, 150, 70),
+            (10, 10, 50, 70), (50, 10, 150, 40), None,
+            None, (50, 40, 100, 70), (100, 40, 150, 70),
         ]
         rows = [
-            FakeRow([(10, 10, 100, 40), None, (100, 10, 150, 40)]),
-            FakeRow([(10, 40, 50, 70), (50, 40, 100, 70), (100, 40, 150, 70)]),
+            FakeRow([(10, 10, 50, 70), (50, 10, 150, 40), None]),
+            FakeRow([None, (50, 40, 100, 70), (100, 40, 150, 70)]),
         ]
 
         def extract(self):
             return [
-                ["Long description\ncontinued", None, "100"],
-                ["A01", "Service", "50"],
+                ["Category", "Long description\\ncontinued", None],
+                [None, "Service", "50"],
             ]
 
     from app.tables import _table_to_payload
 
     result = _table_to_payload(FakeTable(), "lines")
     assert result is not None
-    assert result["rows"][0]["cells"][0]["text"] == "Long description\ncontinued"
-    assert result["rows"][0]["cells"][0]["column_span"] == 2
-    assert result["rows"][0]["cells"][2]["column_index"] == 2
-    assert result["header_names"] == ["Description", "Amount"]
-
+    assert result["rows"][0]["cells"][1]["text"] == "Long description\\ncontinued"
+    assert result["rows"][0]["cells"][1]["column_span"] == 2
+    assert result["rows"][0]["cells"][0]["row_span"] == 2
+    assert result["rows"][0]["cells"][1]["column_index"] == 1
+    assert result["header_names"] == ["Category", "Description", "Amount"]
 
 def test_ruled_pdf_table_is_extracted_with_native_geometry():
     doc = fitz.open()
