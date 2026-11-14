@@ -100,7 +100,7 @@ def extract_native_tables(page) -> list[dict]:
     seen: list[tuple[float, float, float, float]] = []
     for strategy in ("lines", "text"):
         try:
-            finder = page.find_tables(strategy=strategy)
+            finder = page.find_tables(strategy=strategy, min_words_vertical=3, min_words_horizontal=2)
         except Exception:
             continue
         for table in getattr(finder, "tables", []):
