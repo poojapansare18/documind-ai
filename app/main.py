@@ -505,7 +505,7 @@ def get_document(document_id: str) -> sqlite3.Row:
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "service": "documind-api", "version": "0.9.0"}
+    return {"status": "ok", "service": "documind-api", "version": "0.10.0"}
 
 
 @app.get("/", response_class=HTMLResponse)
