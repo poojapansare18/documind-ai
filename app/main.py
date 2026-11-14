@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import os
 import re
+import sqlite3
 import uuid
 from collections import Counter
-from dataclasses import dataclass
+from contextlib import closing
+from pathlib import Path
 from typing import Annotated
 
 import fitz
@@ -14,23 +17,12 @@ from pydantic import BaseModel, Field
 app = FastAPI(
     title="DocuMind API",
     description="A lightweight document intelligence API for PDF extraction, search, and extractive summaries.",
-    version="0.1.0",
+    version="0.2.0",
 )
 
 MAX_FILE_BYTES = 10 * 1024 * 1024
 MAX_PDF_PAGES = 100
-
-
-@dataclass
-class StoredDocument:
-    document_id: str
-    filename: str
-    text: str
-    page_count: int
-
-
-# In-memory storage is intentional for this MVP. Persistence is a later milestone.
-documents: dict[str, StoredDocument] = {}
+DB_PATH = Path(os.getenv("DOCUMIND_DB_PATH", "data/documind.db"))
 
 
 class DocumentResponse(BaseModel):
@@ -38,6 +30,14 @@ class DocumentResponse(BaseModel):
     filename: str
     page_count: int
     character_count: int
+
+
+class DocumentListItem(BaseModel):
+    document_id: str
+    filename: str
+    page_count: int
+    character_count: int
+    created_at: str
 
 
 class SearchRequest(BaseModel):
@@ -66,6 +66,34 @@ STOP_WORDS = {
 }
 
 
+def connect_db() -> sqlite3.Connection:
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(DB_PATH, timeout=10)
+    connection.row_factory = sqlite3.Row
+    return connection
+
+
+def init_db() -> None:
+    with closing(connect_db()) as connection:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS documents (
+                document_id TEXT PRIMARY KEY,
+                filename TEXT NOT NULL,
+                extracted_text TEXT NOT NULL,
+                page_count INTEGER NOT NULL,
+                character_count INTEGER NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        connection.commit()
+
+
+# Initialise the local SQLite database when the application module loads.
+init_db()
+
+
 def extract_pdf(data: bytes) -> tuple[str, int]:
     try:
         with fitz.open(stream=data, filetype="pdf") as pdf:
@@ -75,8 +103,7 @@ def extract_pdf(data: bytes) -> tuple[str, int]:
                 raise HTTPException(status_code=422, detail="The PDF contains no pages.")
             if len(pdf) > MAX_PDF_PAGES:
                 raise HTTPException(status_code=413, detail=f"PDF exceeds the {MAX_PDF_PAGES}-page limit.")
-            pages = [page.get_text("text") for page in pdf]
-            text = "\n\n".join(pages).strip()
+            text = "\n\n".join(page.get_text("text") for page in pdf).strip()
             if not text:
                 raise HTTPException(
                     status_code=422,
@@ -114,9 +141,21 @@ def extractive_summary(text: str, max_sentences: int = 5) -> str:
     return " ".join(item[2] for item in chosen)
 
 
+def get_document(document_id: str) -> sqlite3.Row:
+    with closing(connect_db()) as connection:
+        row = connection.execute(
+            "SELECT document_id, filename, extracted_text, page_count, character_count, created_at "
+            "FROM documents WHERE document_id = ?",
+            (document_id,),
+        ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    return row
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "service": "documind-api", "version": "0.1.0"}
+    return {"status": "ok", "service": "documind-api", "version": "0.2.0"}
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -124,23 +163,23 @@ def home() -> str:
     return """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>DocuMind — Document Intelligence</title><style>
-*{box-sizing:border-box}body{margin:0;background:#f4f6fb;color:#172033;font:16px system-ui, sans-serif}
+*{box-sizing:border-box}body{margin:0;background:#f4f6fb;color:#172033;font:16px system-ui,sans-serif}
 main{max-width:850px;margin:7vh auto;padding:24px}.panel{background:white;border:1px solid #e2e7f0;border-radius:18px;padding:28px;box-shadow:0 12px 35px #1720330b}
 h1{margin:0 0 8px;font-size:2rem}p{color:#596579;line-height:1.55}.upload{border:1px dashed #9ba8bb;border-radius:12px;padding:24px;margin:22px 0;text-align:center}
 button{background:#244bd6;color:white;border:0;border-radius:9px;padding:11px 16px;font-weight:650;cursor:pointer}button:disabled{opacity:.5;cursor:wait}
 input[type=file]{max-width:100%}.result{white-space:pre-wrap;background:#f7f8fc;padding:16px;border-radius:10px;margin-top:14px;line-height:1.6}.muted{font-size:.9rem;color:#748096}
-</style></head><body><main><section class="panel"><p class="muted">DOCUMENT INTELLIGENCE · MVP 0.1</p><h1>DocuMind</h1>
-<p>Upload a text-based PDF to extract its contents, generate an extractive summary, and search within your documents.</p>
+</style></head><body><main><section class="panel"><p class="muted">DOCUMENT INTELLIGENCE · MVP 0.2</p><h1>DocuMind</h1>
+<p>Upload a text-based PDF to extract its contents, generate an extractive summary, and search within your saved documents.</p>
 <div class="upload"><input id="file" type="file" accept="application/pdf"><p><button id="upload">Upload PDF</button></p><span class="muted">PDF only · Maximum 10 MB · 100 pages</span></div>
 <div id="status" role="status" aria-live="polite" class="muted">No document uploaded yet.</div><div id="output"></div></section></main>
 <script>
-const file=document.querySelector('#file'), button=document.querySelector('#upload'), status=document.querySelector('#status'), output=document.querySelector('#output');
-button.addEventListener('click',async()=>{if(!file.files[0]){status.textContent='Choose a PDF first.';return;}button.disabled=true;status.textContent='Processing PDF…';output.innerHTML='';
+const file=document.querySelector('#file'),button=document.querySelector('#upload'),status=document.querySelector('#status'),output=document.querySelector('#output');
+button.addEventListener('click',async()=>{if(!file.files[0]){status.textContent='Choose a PDF first.';return;}button.disabled=true;status.textContent='Processing PDF…';output.replaceChildren();
 try{const data=new FormData();data.append('file',file.files[0]);const res=await fetch('/documents/upload',{method:'POST',body:data});const doc=await res.json();if(!res.ok)throw new Error(doc.detail||'Upload failed');
-status.textContent=`Uploaded ${doc.filename} · ${doc.page_count} pages · ${doc.character_count.toLocaleString()} characters`;
-const summary=await fetch(`/documents/${doc.document_id}/summary`);const result=await summary.json();if(!summary.ok)throw new Error(result.detail||'Summary failed');
+status.textContent='Uploaded '+doc.filename+' · '+doc.page_count+' pages · '+doc.character_count.toLocaleString()+' characters';
+const summary=await fetch('/documents/'+doc.document_id+'/summary');const result=await summary.json();if(!summary.ok)throw new Error(result.detail||'Summary failed');
 const box=document.createElement('div');box.className='result';box.textContent=result.summary;output.append(box);
-}catch(e){status.textContent=`Error: ${e.message}`;}finally{button.disabled=false;}});
+}catch(e){status.textContent='Error: '+e.message;}finally{button.disabled=false;}});
 </script></body></html>"""
 
 
@@ -154,18 +193,51 @@ async def upload_document(file: Annotated[UploadFile, File(description="A text-b
         raise HTTPException(status_code=413, detail="File exceeds the 10 MB limit.")
     if not data.startswith(b"%PDF-"):
         raise HTTPException(status_code=415, detail="The file does not have a valid PDF signature.")
-    text, pages = extract_pdf(data)
+    extracted_text, pages = extract_pdf(data)
     document_id = str(uuid.uuid4())
-    documents[document_id] = StoredDocument(document_id, filename, text, pages)
-    return DocumentResponse(document_id=document_id, filename=filename, page_count=pages, character_count=len(text))
+    with closing(connect_db()) as connection:
+        connection.execute(
+            "INSERT INTO documents (document_id, filename, extracted_text, page_count, character_count) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (document_id, filename, extracted_text, pages, len(extracted_text)),
+        )
+        connection.commit()
+    return DocumentResponse(
+        document_id=document_id,
+        filename=filename,
+        page_count=pages,
+        character_count=len(extracted_text),
+    )
+
+
+@app.get("/documents", response_model=list[DocumentListItem])
+def list_documents() -> list[DocumentListItem]:
+    with closing(connect_db()) as connection:
+        rows = connection.execute(
+            "SELECT document_id, filename, page_count, character_count, created_at "
+            "FROM documents ORDER BY created_at DESC, rowid DESC"
+        ).fetchall()
+    return [DocumentListItem(**dict(row)) for row in rows]
 
 
 @app.get("/documents/{document_id}/summary", response_model=SummaryResponse)
 def summarize_document(document_id: str) -> SummaryResponse:
-    doc = documents.get(document_id)
-    if not doc:
-        raise HTTPException(status_code=404, detail="Document not found. Upload it again; this MVP stores documents in memory.")
-    return SummaryResponse(document_id=doc.document_id, filename=doc.filename, summary=extractive_summary(doc.text))
+    doc = get_document(document_id)
+    return SummaryResponse(
+        document_id=doc["document_id"],
+        filename=doc["filename"],
+        summary=extractive_summary(doc["extracted_text"]),
+    )
+
+
+@app.delete("/documents/{document_id}")
+def delete_document(document_id: str) -> dict[str, str]:
+    with closing(connect_db()) as connection:
+        cursor = connection.execute("DELETE FROM documents WHERE document_id = ?", (document_id,))
+        connection.commit()
+    if cursor.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    return {"document_id": document_id, "status": "deleted"}
 
 
 @app.post("/documents/search", response_model=list[SearchResult])
@@ -173,13 +245,24 @@ def search_documents(request: SearchRequest) -> list[SearchResult]:
     terms = [term for term in re.findall(r"[a-zA-Z0-9]{2,}", request.query.lower()) if term not in STOP_WORDS]
     if not terms:
         raise HTTPException(status_code=422, detail="Search query must contain at least one meaningful term.")
+    with closing(connect_db()) as connection:
+        rows = connection.execute(
+            "SELECT document_id, filename, extracted_text FROM documents"
+        ).fetchall()
     results: list[SearchResult] = []
-    for doc in documents.values():
-        paragraphs = [p.strip() for p in re.split(r"\n\s*\n", doc.text) if p.strip()]
+    for doc in rows:
+        paragraphs = [part.strip() for part in re.split(r"\n\s*\n", doc["extracted_text"]) if part.strip()]
         for paragraph in paragraphs:
             lowered = paragraph.lower()
             score = sum(lowered.count(term) for term in terms)
             if score:
                 snippet = paragraph[:500] + ("…" if len(paragraph) > 500 else "")
-                results.append(SearchResult(document_id=doc.document_id, filename=doc.filename, snippet=snippet, score=score))
+                results.append(
+                    SearchResult(
+                        document_id=doc["document_id"],
+                        filename=doc["filename"],
+                        snippet=snippet,
+                        score=score,
+                    )
+                )
     return sorted(results, key=lambda result: result.score, reverse=True)[: request.limit]
