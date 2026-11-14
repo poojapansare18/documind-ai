@@ -27,11 +27,14 @@ load_dotenv()
 app = FastAPI(
     title="DocuMind API",
     description="A document intelligence API for PDF extraction, keyword search, local semantic retrieval, grounded question answering, and extractive summaries.",
-    version="0.7.0",
+    version="0.8.0",
 )
 
 MAX_FILE_BYTES = 10 * 1024 * 1024
 MAX_PDF_PAGES = 100
+OCR_MIN_NATIVE_CHARS = 30
+OCR_LANGUAGE = os.getenv("DOCUMIND_OCR_LANGUAGE", "eng")
+OCR_DPI = int(os.getenv("DOCUMIND_OCR_DPI", "200"))
 CHUNK_MAX_CHARS = 1200
 CHUNK_OVERLAP = 150
 DB_PATH = Path(os.getenv("DOCUMIND_DB_PATH", "data/documind.db"))
@@ -78,6 +81,8 @@ class DocumentPageResponse(BaseModel):
     page_number: int
     character_count: int
     text: str
+    extraction_method: str = "native"
+    ocr_applied: bool = False
 
 
 class LayoutSpan(BaseModel):
@@ -130,6 +135,8 @@ class DocumentPageLayoutResponse(BaseModel):
     page_width: float
     page_height: float
     blocks: list[LayoutBlock]
+    extraction_method: str = "native"
+    ocr_applied: bool = False
 
 
 class DocumentChunkResponse(BaseModel):
@@ -314,6 +321,39 @@ def init_db() -> None:
 init_db()
 
 
+def extract_page_text(page) -> tuple[str, object | None, str]:
+    """Extract native text and fall back to OCR when a page has no usable text layer."""
+    native_text = page.get_text("text").strip()
+    has_images = bool(page.get_images(full=True))
+    has_drawings = bool(page.get_drawings())
+    needs_ocr = len(native_text) < OCR_MIN_NATIVE_CHARS and (has_images or has_drawings)
+    if not needs_ocr:
+        return native_text, None, "native"
+
+    try:
+        text_page = page.get_textpage_ocr(
+            language=OCR_LANGUAGE,
+            dpi=OCR_DPI,
+            full=True,
+        )
+        recognised_text = page.get_text("text", textpage=text_page).strip()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "OCR is required for this PDF page, but the OCR engine or language data is unavailable. "
+                "Install Tesseract and its language pack, then check TESSDATA_PREFIX."
+            ),
+        ) from exc
+
+    if not recognised_text:
+        raise HTTPException(
+            status_code=422,
+            detail="OCR did not recognise readable text on one or more pages.",
+        )
+    return recognised_text, text_page, "ocr"
+
+
 def extract_pdf(data: bytes) -> tuple[list[str], int, list[dict]]:
     try:
         with fitz.open(stream=data, filetype="pdf") as pdf:
@@ -326,9 +366,11 @@ def extract_pdf(data: bytes) -> tuple[list[str], int, list[dict]]:
             page_texts: list[str] = []
             page_layouts: list[dict] = []
             for page in pdf:
-                page_texts.append(page.get_text("text").strip())
+                page_text, text_page, extraction_method = extract_page_text(page)
+                page_texts.append(page_text)
+                text_kwargs = {"textpage": text_page} if text_page is not None else {}
                 blocks = []
-                for block_index, block in enumerate(page.get_text("dict").get("blocks", [])):
+                for block_index, block in enumerate(page.get_text("dict", **text_kwargs).get("blocks", [])):
                     if block.get("type") != 0:
                         continue
                     source_lines = block.get("lines", [])
@@ -360,7 +402,7 @@ def extract_pdf(data: bytes) -> tuple[list[str], int, list[dict]]:
                             "text": line_text,
                             "spans": span_items,
                         })
-                    block_text = "\\n".join(line_texts).strip()
+                    block_text = "\n".join(line_texts).strip()
                     if block_text:
                         blocks.append({
                             "block_index": block_index,
@@ -381,25 +423,23 @@ def extract_pdf(data: bytes) -> tuple[list[str], int, list[dict]]:
                         "line_no": int(word[6]),
                         "word_no": int(word[7]),
                     }
-                    for word in page.get_text("words")
+                    for word in page.get_text("words", **text_kwargs)
                 ]
                 page_layouts.append({
                     "page_width": round(float(page.rect.width), 2),
                     "page_height": round(float(page.rect.height), 2),
                     "blocks": blocks,
                     "words": page_words,
+                    "extraction_method": extraction_method,
+                    "ocr_applied": extraction_method == "ocr",
                 })
             if not any(page_texts):
-                raise HTTPException(
-                    status_code=422,
-                    detail="No selectable text was found. Scanned PDFs require OCR, which is not included in this version.",
-                )
+                raise HTTPException(status_code=422, detail="No readable text was found in the PDF.")
             return page_texts, len(pdf), page_layouts
     except HTTPException:
         raise
     except Exception as exc:
         raise HTTPException(status_code=422, detail="The uploaded file is not a valid readable PDF.") from exc
-
 
 def sentence_split(text: str) -> list[str]:
     cleaned = re.sub(r"\s+", " ", text).strip()
@@ -440,7 +480,7 @@ def get_document(document_id: str) -> sqlite3.Row:
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "service": "documind-api", "version": "0.7.0"}
+    return {"status": "ok", "service": "documind-api", "version": "0.8.0"}
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -454,7 +494,7 @@ h1{margin:0 0 8px;font-size:2rem}p{color:#596579;line-height:1.55}.upload{border
 button{background:#244bd6;color:white;border:0;border-radius:9px;padding:11px 16px;font-weight:650;cursor:pointer}button:disabled{opacity:.5;cursor:wait}
 input[type=file]{max-width:100%}.result{white-space:pre-wrap;background:#f7f8fc;padding:16px;border-radius:10px;margin-top:14px;line-height:1.6}.muted{font-size:.9rem;color:#748096}
 </style></head><body><main><section class="panel"><p class="muted">DOCUMENT INTELLIGENCE · MVP 0.7</p><h1>DocuMind</h1>
-<p>Upload a text-based PDF to extract its contents, generate an extractive summary, and search within your saved documents. Use the API documentation to index documents, search semantically, and ask questions with source citations.</p>
+<p>Upload a PDF to extract its contents, including scanned pages using OCR, generate an extractive summary, and search within your saved documents. Use the API documentation to index documents, search semantically, and ask questions with source citations.</p>
 <div class="upload"><input id="file" type="file" accept="application/pdf"><p><button id="upload">Upload PDF</button></p><span class="muted">PDF only · Maximum 10 MB · 100 pages</span></div>
 <div id="status" role="status" aria-live="polite" class="muted">No document uploaded yet.</div><div id="output"></div></section></main>
 <script>
@@ -469,7 +509,7 @@ const box=document.createElement('div');box.className='result';box.textContent=r
 
 
 @app.post("/documents/upload", response_model=DocumentResponse, status_code=201)
-async def upload_document(file: Annotated[UploadFile, File(description="A text-based PDF document")]) -> DocumentResponse:
+async def upload_document(file: Annotated[UploadFile, File(description="A PDF document; scanned pages are processed with OCR")]) -> DocumentResponse:
     filename = file.filename or "document.pdf"
     if not filename.lower().endswith(".pdf") or file.content_type not in {"application/pdf", "application/octet-stream"}:
         raise HTTPException(status_code=415, detail="Only PDF files are accepted.")
@@ -541,7 +581,7 @@ def get_document_pages(document_id: str) -> list[DocumentPageResponse]:
     get_document(document_id)
     with closing(connect_db()) as connection:
         rows = connection.execute(
-            "SELECT document_id, page_number, extracted_text FROM document_pages "
+            "SELECT document_id, page_number, extracted_text, layout_json FROM document_pages "
             "WHERE document_id = ? ORDER BY page_number",
             (document_id,),
         ).fetchall()
@@ -551,6 +591,8 @@ def get_document_pages(document_id: str) -> list[DocumentPageResponse]:
             page_number=row["page_number"],
             character_count=len(row["extracted_text"]),
             text=row["extracted_text"],
+            extraction_method=json.loads(row["layout_json"] or "{}").get("extraction_method", "native"),
+            ocr_applied=json.loads(row["layout_json"] or "{}").get("ocr_applied", False),
         )
         for row in rows
     ]
@@ -574,6 +616,8 @@ def get_document_layout(document_id: str) -> list[DocumentPageLayoutResponse]:
             page_width=layout.get("page_width", 0),
             page_height=layout.get("page_height", 0),
             blocks=[LayoutBlock(**block) for block in layout.get("blocks", [])],
+            extraction_method=layout.get("extraction_method", "native"),
+            ocr_applied=layout.get("ocr_applied", False),
         ))
     return pages
 

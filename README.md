@@ -1,13 +1,14 @@
 # DocuMind — Document Intelligence
 
-A document-intelligence API and lightweight web interface that accepts text-based PDFs, extracts their text, creates extractive summaries, and searches uploaded documents.
+A document-intelligence API and lightweight web interface that accepts text-based and scanned PDFs, extracts their text, creates extractive summaries, and searches uploaded documents.
 
-> **Current scope:** MVP 0.7. Summaries are extractive (selected from the source text), not LLM-generated. Uploaded document text and metadata are stored in a local SQLite database. Scanned PDFs and OCR are not supported yet.
+> **Current scope:** MVP 0.8. Summaries are extractive (selected from the source text), not LLM-generated. Uploaded document text and metadata are stored in a local SQLite database. Scanned PDFs are processed with optional page-level OCR. Tesseract and its language data must be installed.
 
 ## Features
 
 - PDF upload with file signature, size, content-type, and page-count validation
 - Text extraction with PyMuPDF
+- OCR fallback for image-based or text-sparse pages using Tesseract
 - Extractive summaries using a transparent baseline algorithm
 - Keyword-based search across saved documents
 - SQLite persistence with page-level text records
@@ -22,7 +23,7 @@ A document-intelligence API and lightweight web interface that accepts text-base
 - Layout inspection endpoint for page-by-page text blocks
 - Document listing and deletion
 - FastAPI endpoints and interactive Swagger documentation
-- Automated API tests and GitHub Actions CI
+- Automated API tests, including a real scanned-PDF OCR integration test, and GitHub Actions CI
 
 ## Architecture
 
@@ -30,8 +31,12 @@ A document-intelligence API and lightweight web interface that accepts text-base
 flowchart TD
     A[Browser UI / API client] --> B[FastAPI]
     B --> C[PDF validation]
-    C --> D[PyMuPDF text extraction]
-    D --> E[SQLite document store]
+    C --> D[Native text extraction]
+    D --> Q{Usable text layer?}
+    Q -->|Yes| E[Page text and layout]
+    Q -->|No| R[Tesseract OCR]
+    R --> E
+    E --> S[SQLite document store]
     E --> F[Extractive summary]
     E --> G[Page-aware keyword search]
     E --> H[Document and page retrieval]
@@ -61,6 +66,8 @@ Open:
 - Swagger UI: http://127.0.0.1:8000/docs
 - Health check: http://127.0.0.1:8000/health
 
+OCR is triggered for pages with very little native text when the page contains raster images or vector drawings. Completely blank pages are left untouched. OCR uses Tesseract through PyMuPDF at 200 DPI by default. Set `DOCUMIND_OCR_LANGUAGE` to a Tesseract language code such as `eng` or `eng+fra`, and `DOCUMIND_OCR_DPI` to change the render resolution. Tesseract is a separate system dependency, not a Python package. On Windows, install Tesseract OCR and its language data, then set `TESSDATA_PREFIX` to the `tessdata` directory. The Docker image installs Tesseract and English language data automatically. OCR is slower than native text extraction.
+
 The default SQLite database is created at `data/documind.db`. Set `DOCUMIND_DB_PATH` to use another location. FastEmbed downloads its default model on the first indexing request and caches it locally. Set `DOCUMIND_EMBEDDING_MODEL` to select another supported model and `FASTEMBED_CACHE_PATH` to change the model cache directory. Copy `.env.example` to `.env` and add an OpenAI API key to enable generated answers.
 
 ## Run tests
@@ -77,7 +84,7 @@ python -m pytest -v
 | POST | `/documents/upload` | Validate, extract, and save a PDF |
 | GET | `/documents` | List saved documents |
 | GET | `/documents/{document_id}` | Retrieve document metadata |
-| GET | `/documents/{document_id}/pages` | Retrieve extracted text by page |
+| GET | `/documents/{document_id}/pages` | Retrieve extracted text by page, including extraction method and OCR status |
 | GET | `/documents/{document_id}/layout` | Retrieve text blocks with page coordinates and font metadata |
 | GET | `/documents/{document_id}/tables` | Return heuristic table candidates by page |
 | GET | `/documents/{document_id}/chunks` | Retrieve persisted text chunks with page and character offsets |
@@ -92,7 +99,7 @@ python -m pytest -v
 
 Each uploaded PDF is stored as a document record plus one text record per page. Search results include the page number, making it possible to trace a match back to its source location. Existing documents created before page-level storage are migrated into a page-one record when the application starts.
 
-The layout endpoint preserves text-block bounding boxes, page dimensions, block and line bounding boxes, span coordinates, font names, and font sizes from PyMuPDF. This is a geometry-preserving foundation for layout analysis, not yet automatic table reconstruction: multi-column layouts and complex tables may still require specialised detection. Scanned PDFs still require OCR.
+The layout endpoint preserves text-block bounding boxes, page dimensions, block and line bounding boxes, span coordinates, font names, and font sizes from PyMuPDF. Page and layout retrieval also report whether native extraction or OCR was used. This is a geometry-preserving foundation for layout analysis, not yet automatic table reconstruction: multi-column layouts and complex tables may still require specialised detection.
 
 ## Chunking model
 
@@ -111,11 +118,11 @@ This endpoint requires `OPENAI_API_KEY`; the default model is `gpt-5.5`, configu
 ## Next milestones
 
 1. Improve table reconstruction and infer reading order for multi-column pages.
-2. Add OCR, authentication, observability, and deployment hardening.
+2. Add authentication, observability, and deployment hardening.
 
 ## Security notes
 
-The MVP enforces a 10 MB upload limit and a 100-page limit. It does not yet include authentication, malware scanning, OCR, or production-grade rate limiting. Uploaded text is stored locally without encryption. Do not upload confidential documents to an internet-facing instance.
+The MVP enforces a 10 MB upload limit and a 100-page limit. It does not yet include authentication, malware scanning, or production-grade rate limiting. OCR quality depends on scan resolution, contrast, skew, language-pack availability, and document quality; recognised text should be checked against the original page. Uploaded text is stored locally without encryption. Do not upload confidential documents to an internet-facing instance.
 
 ## Run with Docker
 
@@ -123,7 +130,7 @@ The MVP enforces a 10 MB upload limit and a 100-page limit. It does not yet incl
 docker compose up --build
 ```
 
-The application is then available at http://127.0.0.1:8000. The SQLite database is stored in the container's `data/` directory; container recreation without a mounted volume can remove it.
+The application is then available at http://127.0.0.1:8000. The Docker image includes Tesseract OCR and the English language pack. The SQLite database is stored in the container's `data/` directory; container recreation without a mounted volume can remove it.
 
 ## Continuous integration
 

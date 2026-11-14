@@ -516,3 +516,152 @@ def test_rag_citation_validation_rejects_missing_or_unknown_sources():
     assert validate_answer_citations("A claim with an unknown source [S3].", 2) == ABSTENTION
     assert validate_answer_citations("A claim supported by source [S2].", 2) == "A claim supported by source [S2]."
     assert validate_answer_citations(ABSTENTION, 0) == ABSTENTION
+
+
+
+def test_extract_page_text_uses_ocr_for_image_only_page():
+    class FakePage:
+        def get_text(self, option, textpage=None):
+            if option == "text" and textpage is None:
+                return ""
+            if option == "text" and textpage == "ocr-result":
+                return "Recognised text from a scanned document page."
+            return ""
+
+        def get_images(self, full=True):
+            return [(1, 0, 100, 100, 8, "DeviceRGB", "", "Im1", "DCTDecode", 0)]
+
+        def get_drawings(self):
+            return []
+
+        def get_textpage_ocr(self, language, dpi, full):
+            assert language == main.OCR_LANGUAGE
+            assert dpi == main.OCR_DPI
+            assert full is True
+            return "ocr-result"
+
+    text, text_page, method = main.extract_page_text(FakePage())
+    assert text == "Recognised text from a scanned document page."
+    assert text_page == "ocr-result"
+    assert method == "ocr"
+
+
+def test_extract_page_text_skips_ocr_for_native_text():
+    class FakePage:
+        def get_text(self, option, textpage=None):
+            return "This is a sufficiently long native text layer for extraction."
+
+        def get_images(self, full=True):
+            return []
+
+        def get_drawings(self):
+            return []
+
+        def get_textpage_ocr(self, **kwargs):
+            raise AssertionError("OCR should not run for a normal text-based page.")
+
+    text, text_page, method = main.extract_page_text(FakePage())
+    assert text.startswith("This is a sufficiently long")
+    assert text_page is None
+    assert method == "native"
+
+
+def test_extract_page_text_returns_clear_error_when_ocr_engine_is_missing():
+    import pytest
+    from fastapi import HTTPException
+
+    class FakePage:
+        def get_text(self, option, textpage=None):
+            return ""
+
+        def get_images(self, full=True):
+            return [(1, 0, 100, 100, 8, "DeviceRGB", "", "Im1", "DCTDecode", 0)]
+
+        def get_drawings(self):
+            return []
+
+        def get_textpage_ocr(self, **kwargs):
+            raise RuntimeError("Tesseract is not installed")
+
+    with pytest.raises(HTTPException) as error:
+        main.extract_page_text(FakePage())
+    assert error.value.status_code == 503
+    assert "Tesseract" in error.value.detail
+
+
+def test_page_api_exposes_ocr_provenance(monkeypatch):
+    monkeypatch.setattr(
+        main,
+        "extract_pdf",
+        lambda data: (
+            ["Recognised scanned page content."],
+            1,
+            [{
+                "page_width": 595.0,
+                "page_height": 842.0,
+                "blocks": [],
+                "words": [],
+                "extraction_method": "ocr",
+                "ocr_applied": True,
+            }],
+        ),
+    )
+    upload = client.post(
+        "/documents/upload",
+        files={"file": ("scanned.pdf", make_pdf("placeholder"), "application/pdf")},
+    )
+    assert upload.status_code == 201
+    pages = client.get(f"/documents/{upload.json()['document_id']}/pages")
+    assert pages.status_code == 200
+    assert pages.json()[0]["extraction_method"] == "ocr"
+    assert pages.json()[0]["ocr_applied"] is True
+    assert pages.json()[0]["text"] == "Recognised scanned page content."
+
+
+
+def test_extract_page_text_does_not_ocr_a_blank_page():
+    class FakePage:
+        def get_text(self, option, textpage=None):
+            return ""
+
+        def get_images(self, full=True):
+            return []
+
+        def get_drawings(self):
+            return []
+
+        def get_textpage_ocr(self, **kwargs):
+            raise AssertionError("A blank page should not trigger OCR.")
+
+    text, text_page, method = main.extract_page_text(FakePage())
+    assert text == ""
+    assert text_page is None
+    assert method == "native"
+
+
+
+def test_scanned_pdf_is_ocr_processed_end_to_end():
+    import shutil
+    import pytest
+
+    if shutil.which("tesseract") is None:
+        pytest.skip("Tesseract is not installed in this environment.")
+
+    source = fitz.open()
+    source_page = source.new_page()
+    source_page.insert_text((72, 90), "SCANNED INVOICE NUMBER 12345")
+    pixmap = source_page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
+
+    scanned = fitz.open()
+    scanned_page = scanned.new_page(width=source_page.rect.width, height=source_page.rect.height)
+    scanned_page.insert_image(scanned_page.rect, stream=pixmap.tobytes("png"))
+    pdf_bytes = scanned.tobytes()
+    source.close()
+    scanned.close()
+
+    page_texts, page_count, layouts = main.extract_pdf(pdf_bytes)
+    assert page_count == 1
+    assert "SCANNED" in page_texts[0].upper()
+    assert "12345" in page_texts[0]
+    assert layouts[0]["extraction_method"] == "ocr"
+    assert layouts[0]["ocr_applied"] is True
