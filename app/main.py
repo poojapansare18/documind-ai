@@ -6,23 +6,23 @@ import os
 import re
 import sqlite3
 import uuid
-
-from dotenv import load_dotenv
-
-load_dotenv()
 from collections import Counter
 from contextlib import closing
 from pathlib import Path
 from typing import Annotated
 
 import fitz
+from dotenv import load_dotenv
+from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.responses import HTMLResponse
+from pydantic import BaseModel, Field
+
 from app.chunking import chunk_text
 from app.embeddings import MODEL_NAME, embed_passages, embed_query
 from app.generation import generate_grounded_answer
 from app.layout import detect_table_candidates
-from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import HTMLResponse
-from pydantic import BaseModel, Field
+
+load_dotenv()
 
 app = FastAPI(
     title="DocuMind API",
