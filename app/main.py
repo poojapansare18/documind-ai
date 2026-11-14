@@ -20,14 +20,14 @@ from pydantic import BaseModel, Field
 from app.chunking import chunk_text
 from app.embeddings import MODEL_NAME, embed_passages, embed_query
 from app.generation import generate_grounded_answer
-from app.layout import detect_table_candidates
+from app.layout import detect_table_candidates, reconstruct_reading_order
 
 load_dotenv()
 
 app = FastAPI(
     title="DocuMind API",
-    description="A document intelligence API for PDF extraction, keyword search, local semantic retrieval, grounded question answering, and extractive summaries.",
-    version="0.8.0",
+    description="A document intelligence API for PDF extraction, OCR, layout-aware reading order, keyword search, semantic retrieval, and grounded question answering.",
+    version="0.9.0",
 )
 
 MAX_FILE_BYTES = 10 * 1024 * 1024
@@ -83,6 +83,8 @@ class DocumentPageResponse(BaseModel):
     text: str
     extraction_method: str = "native"
     ocr_applied: bool = False
+    layout_type: str = "single_column"
+    column_count: int = 1
 
 
 class LayoutSpan(BaseModel):
@@ -137,6 +139,8 @@ class DocumentPageLayoutResponse(BaseModel):
     blocks: list[LayoutBlock]
     extraction_method: str = "native"
     ocr_applied: bool = False
+    layout_type: str = "single_column"
+    column_count: int = 1
 
 
 class DocumentChunkResponse(BaseModel):
@@ -367,7 +371,6 @@ def extract_pdf(data: bytes) -> tuple[list[str], int, list[dict]]:
             page_layouts: list[dict] = []
             for page in pdf:
                 page_text, text_page, extraction_method = extract_page_text(page)
-                page_texts.append(page_text)
                 text_kwargs = {"textpage": text_page} if text_page is not None else {}
                 blocks = []
                 for block_index, block in enumerate(page.get_text("dict", **text_kwargs).get("blocks", [])):
@@ -425,6 +428,14 @@ def extract_pdf(data: bytes) -> tuple[list[str], int, list[dict]]:
                     }
                     for word in page.get_text("words", **text_kwargs)
                 ]
+                reading_order = reconstruct_reading_order(
+                    page_words,
+                    page_width=float(page.rect.width),
+                    fallback_text=page_text,
+                )
+                if reading_order["layout_type"] == "two_column":
+                    page_text = reading_order["text"]
+                page_texts.append(page_text)
                 page_layouts.append({
                     "page_width": round(float(page.rect.width), 2),
                     "page_height": round(float(page.rect.height), 2),
@@ -432,6 +443,8 @@ def extract_pdf(data: bytes) -> tuple[list[str], int, list[dict]]:
                     "words": page_words,
                     "extraction_method": extraction_method,
                     "ocr_applied": extraction_method == "ocr",
+                    "layout_type": reading_order["layout_type"],
+                    "column_count": reading_order["column_count"],
                 })
             if not any(page_texts):
                 raise HTTPException(status_code=422, detail="No readable text was found in the PDF.")
@@ -480,7 +493,7 @@ def get_document(document_id: str) -> sqlite3.Row:
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "service": "documind-api", "version": "0.8.0"}
+    return {"status": "ok", "service": "documind-api", "version": "0.9.0"}
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -593,6 +606,8 @@ def get_document_pages(document_id: str) -> list[DocumentPageResponse]:
             text=row["extracted_text"],
             extraction_method=json.loads(row["layout_json"] or "{}").get("extraction_method", "native"),
             ocr_applied=json.loads(row["layout_json"] or "{}").get("ocr_applied", False),
+            layout_type=json.loads(row["layout_json"] or "{}").get("layout_type", "single_column"),
+            column_count=json.loads(row["layout_json"] or "{}").get("column_count", 1),
         )
         for row in rows
     ]
@@ -618,6 +633,8 @@ def get_document_layout(document_id: str) -> list[DocumentPageLayoutResponse]:
             blocks=[LayoutBlock(**block) for block in layout.get("blocks", [])],
             extraction_method=layout.get("extraction_method", "native"),
             ocr_applied=layout.get("ocr_applied", False),
+            layout_type=layout.get("layout_type", "single_column"),
+            column_count=layout.get("column_count", 1),
         ))
     return pages
 

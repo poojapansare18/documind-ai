@@ -127,3 +127,91 @@ def detect_table_candidates(
             ],
         })
     return tables
+
+def reconstruct_reading_order(
+    words: list[dict],
+    page_width: float,
+    fallback_text: str = "",
+    gutter_tolerance: float = 12.0,
+    minimum_column_lines: int = 2,
+) -> dict:
+    """Reorder clear two-column pages as left column then right column.
+
+    Word lines are split at unusually wide horizontal gaps so that left and
+    right column text sharing the same baseline are not mistaken for one line.
+    Full-width lines divide the page into vertical reading bands.
+    """
+    lines = _group_words_into_lines(words)
+    records = []
+    column_gap_threshold = max(36.0, float(page_width) * 0.06)
+    for line in lines:
+        line_words = line["words"]
+        if not line_words:
+            continue
+
+        segments = [[line_words[0]]]
+        for word in line_words[1:]:
+            previous = segments[-1][-1]
+            gap = float(word.get("x0", 0)) - float(previous.get("x1", 0))
+            if gap >= column_gap_threshold:
+                segments.append([word])
+            else:
+                segments[-1].append(word)
+
+        # Three or more separated groups on one baseline are more likely to
+        # be table cells than prose columns. Keep that row together.
+        if len(segments) > 2:
+            segments = [line_words]
+
+        for segment in segments:
+            x0 = min(float(word.get("x0", 0)) for word in segment)
+            x1 = max(float(word.get("x1", 0)) for word in segment)
+            records.append({
+                "y": float(line["y"]),
+                "x0": x0,
+                "x1": x1,
+                "text": " ".join(str(word.get("text", "")) for word in segment).strip(),
+            })
+
+    midpoint = float(page_width) / 2.0
+    left_lines = []
+    right_lines = []
+    spanning_lines = []
+    for line in records:
+        if line["x1"] <= midpoint - gutter_tolerance:
+            left_lines.append(line)
+        elif line["x0"] >= midpoint + gutter_tolerance:
+            right_lines.append(line)
+        elif line["x0"] < midpoint - gutter_tolerance and line["x1"] > midpoint + gutter_tolerance:
+            spanning_lines.append(line)
+        elif (line["x0"] + line["x1"]) / 2.0 < midpoint:
+            left_lines.append(line)
+        else:
+            right_lines.append(line)
+
+    if len(left_lines) < minimum_column_lines or len(right_lines) < minimum_column_lines:
+        return {
+            "text": fallback_text,
+            "layout_type": "single_column",
+            "column_count": 1,
+        }
+
+    ordered_text = []
+    remaining_left = sorted(left_lines, key=lambda item: item["y"])
+    remaining_right = sorted(right_lines, key=lambda item: item["y"])
+    for spanning in sorted(spanning_lines, key=lambda item: item["y"]):
+        band_left = [line for line in remaining_left if line["y"] < spanning["y"]]
+        band_right = [line for line in remaining_right if line["y"] < spanning["y"]]
+        ordered_text.extend(line["text"] for line in band_left)
+        ordered_text.extend(line["text"] for line in band_right)
+        remaining_left = [line for line in remaining_left if line["y"] >= spanning["y"]]
+        remaining_right = [line for line in remaining_right if line["y"] >= spanning["y"]]
+        ordered_text.append(spanning["text"])
+
+    ordered_text.extend(line["text"] for line in remaining_left)
+    ordered_text.extend(line["text"] for line in remaining_right)
+    return {
+        "text": "\n".join(text for text in ordered_text if text),
+        "layout_type": "two_column",
+        "column_count": 2,
+    }

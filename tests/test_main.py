@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 import app.main as main
 from app.chunking import chunk_text
 from app.generation import ABSTENTION, validate_answer_citations
-from app.layout import detect_table_candidates
+from app.layout import detect_table_candidates, reconstruct_reading_order
 
 client = TestClient(main.app)
 
@@ -665,3 +665,87 @@ def test_scanned_pdf_is_ocr_processed_end_to_end():
     assert "12345" in page_texts[0]
     assert layouts[0]["extraction_method"] == "ocr"
     assert layouts[0]["ocr_applied"] is True
+
+
+
+def make_two_column_pdf() -> bytes:
+    doc = fitz.open()
+    page = doc.new_page(width=600, height=800)
+    for index, text in enumerate(["LEFT COLUMN FIRST", "LEFT COLUMN SECOND", "LEFT COLUMN THIRD"]):
+        page.insert_text((50, 100 + index * 24), text)
+    for index, text in enumerate(["RIGHT COLUMN FIRST", "RIGHT COLUMN SECOND", "RIGHT COLUMN THIRD"]):
+        page.insert_text((330, 100 + index * 24), text)
+    data = doc.tobytes()
+    doc.close()
+    return data
+
+
+def test_two_column_pdf_is_reconstructed_left_column_then_right():
+    page_texts, page_count, layouts = main.extract_pdf(make_two_column_pdf())
+    assert page_count == 1
+    assert layouts[0]["layout_type"] == "two_column"
+    assert layouts[0]["column_count"] == 2
+    expected = [
+        "LEFT COLUMN FIRST",
+        "LEFT COLUMN SECOND",
+        "LEFT COLUMN THIRD",
+        "RIGHT COLUMN FIRST",
+        "RIGHT COLUMN SECOND",
+        "RIGHT COLUMN THIRD",
+    ]
+    assert page_texts[0].splitlines() == expected
+
+
+def test_two_column_reconstruction_preserves_full_width_heading_and_footer():
+    words = []
+
+    def add_line(text, x0, y, width):
+        words.append({
+            "x0": x0, "y0": y, "x1": x0 + width, "y1": y + 10,
+            "text": text, "block_no": 0, "line_no": 0, "word_no": 0,
+        })
+
+    add_line("REPORT TITLE", 50, 10, 500)
+    add_line("LEFT ONE", 50, 100, 100)
+    add_line("LEFT TWO", 50, 120, 100)
+    add_line("RIGHT ONE", 330, 100, 100)
+    add_line("RIGHT TWO", 330, 120, 100)
+    add_line("FULL WIDTH FOOTER", 50, 500, 500)
+
+    result = reconstruct_reading_order(words, page_width=600, fallback_text="native fallback")
+    assert result["layout_type"] == "two_column"
+    assert result["column_count"] == 2
+    assert result["text"].splitlines() == [
+        "REPORT TITLE",
+        "LEFT ONE",
+        "LEFT TWO",
+        "RIGHT ONE",
+        "RIGHT TWO",
+        "FULL WIDTH FOOTER",
+    ]
+
+
+def test_single_column_page_keeps_native_reading_order():
+    words = [
+        {"x0": 50, "y0": 10, "x1": 180, "y1": 20, "text": "FIRST LINE"},
+        {"x0": 50, "y0": 30, "x1": 190, "y1": 40, "text": "SECOND LINE"},
+        {"x0": 50, "y0": 50, "x1": 170, "y1": 60, "text": "THIRD LINE"},
+    ]
+    result = reconstruct_reading_order(words, page_width=600, fallback_text="FIRST\nSECOND\nTHIRD")
+    assert result["layout_type"] == "single_column"
+    assert result["column_count"] == 1
+    assert result["text"] == "FIRST\nSECOND\nTHIRD"
+
+
+def test_uploaded_two_column_pdf_exposes_layout_classification():
+    upload = client.post(
+        "/documents/upload",
+        files={"file": ("two-columns.pdf", make_two_column_pdf(), "application/pdf")},
+    )
+    assert upload.status_code == 201
+    document_id = upload.json()["document_id"]
+    pages = client.get(f"/documents/{document_id}/pages")
+    assert pages.status_code == 200
+    assert pages.json()[0]["layout_type"] == "two_column"
+    assert pages.json()[0]["column_count"] == 2
+    assert pages.json()[0]["text"].index("LEFT COLUMN THIRD") < pages.json()[0]["text"].index("RIGHT COLUMN FIRST")
