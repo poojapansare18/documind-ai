@@ -123,7 +123,7 @@ class TableRow(BaseModel):
 class TableCandidate(BaseModel):
     row_count: int
     column_count: int
-    column_starts: list[float] = []
+    column_starts: list[float] = Field(default_factory=list)
     header_row_index: int | None = None
     confidence: float
     rows: list[TableRow]
