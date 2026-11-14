@@ -2,13 +2,14 @@
 
 A document-intelligence API and lightweight web interface that accepts text-based and scanned PDFs, extracts their text, creates extractive summaries, and searches uploaded documents.
 
-> **Current scope:** MVP 0.8. Summaries are extractive (selected from the source text), not LLM-generated. Uploaded document text and metadata are stored in a local SQLite database. Scanned PDFs are processed with optional page-level OCR. Tesseract and its language data must be installed.
+> **Current scope:** MVP 0.9. Summaries are extractive (selected from the source text), not LLM-generated. Uploaded document text and metadata are stored in a local SQLite database. Scanned PDFs are processed with optional page-level OCR. Tesseract and its language data must be installed.
 
 ## Features
 
 - PDF upload with file signature, size, content-type, and page-count validation
 - Text extraction with PyMuPDF
 - OCR fallback for image-based or text-sparse pages using Tesseract
+- Heuristic two-column reading-order reconstruction with full-width heading and footer handling
 - Extractive summaries using a transparent baseline algorithm
 - Keyword-based search across saved documents
 - SQLite persistence with page-level text records
@@ -84,8 +85,8 @@ python -m pytest -v
 | POST | `/documents/upload` | Validate, extract, and save a PDF |
 | GET | `/documents` | List saved documents |
 | GET | `/documents/{document_id}` | Retrieve document metadata |
-| GET | `/documents/{document_id}/pages` | Retrieve extracted text by page, including extraction method and OCR status |
-| GET | `/documents/{document_id}/layout` | Retrieve text blocks with page coordinates and font metadata |
+| GET | `/documents/{document_id}/pages` | Retrieve extracted text by page, including extraction method, OCR status, and layout classification |
+| GET | `/documents/{document_id}/layout` | Retrieve text blocks, page coordinates, font metadata, and layout classification |
 | GET | `/documents/{document_id}/tables` | Return heuristic table candidates by page |
 | GET | `/documents/{document_id}/chunks` | Retrieve persisted text chunks with page and character offsets |
 | POST | `/documents/{document_id}/index` | Generate and persist local embeddings for a document's chunks |
@@ -99,7 +100,7 @@ python -m pytest -v
 
 Each uploaded PDF is stored as a document record plus one text record per page. Search results include the page number, making it possible to trace a match back to its source location. Existing documents created before page-level storage are migrated into a page-one record when the application starts.
 
-The layout endpoint preserves text-block bounding boxes, page dimensions, block and line bounding boxes, span coordinates, font names, and font sizes from PyMuPDF. Page and layout retrieval also report whether native extraction or OCR was used. This is a geometry-preserving foundation for layout analysis, not yet automatic table reconstruction: multi-column layouts and complex tables may still require specialised detection.
+The layout endpoint preserves text-block bounding boxes, page dimensions, block and line bounding boxes, span coordinates, font names, and font sizes from PyMuPDF. Page and layout retrieval report whether native extraction or OCR was used and classify the page as single-column or two-column. When two columns are detected, extracted text is reordered top-to-bottom within the left column, then top-to-bottom within the right column. Full-width lines are treated as separators between vertical reading bands. This remains a geometry heuristic: pages with sidebars, uneven columns, complex tables, or unusual magazine layouts may be classified incorrectly.
 
 ## Chunking model
 
@@ -117,7 +118,7 @@ This endpoint requires `OPENAI_API_KEY`; the default model is `gpt-5.5`, configu
 
 ## Next milestones
 
-1. Improve table reconstruction and infer reading order for multi-column pages.
+1. Improve table reconstruction for merged cells, multiline rows, and page-spanning tables.
 2. Add authentication, observability, and deployment hardening.
 
 ## Security notes
