@@ -2,6 +2,7 @@ import fitz
 from fastapi.testclient import TestClient
 
 import app.main as main
+from app.chunking import chunk_text
 from app.layout import detect_table_candidates
 
 client = TestClient(main.app)
@@ -247,3 +248,74 @@ def test_document_tables_endpoint_returns_page_results():
     assert len(response.json()) == 1
     assert response.json()[0]["page_number"] == 1
     assert response.json()[0]["tables"] == []
+
+
+
+def test_chunk_text_preserves_offsets_and_overlap():
+    text = ("A useful sentence about document retrieval and source citations. " * 40).strip()
+    chunks = chunk_text(text, max_chars=300, overlap=50)
+    assert len(chunks) > 1
+    for item in chunks:
+        assert item["text"] == text[item["start_char"]:item["end_char"]]
+        assert item["end_char"] - item["start_char"] == len(item["text"])
+        assert len(item["text"]) <= 300
+    assert chunks[1]["start_char"] < chunks[0]["end_char"]
+
+
+def test_chunk_text_handles_empty_and_short_text():
+    assert chunk_text("") == []
+    assert chunk_text("A short page.") == [{
+        "chunk_index": 0,
+        "start_char": 0,
+        "end_char": 13,
+        "text": "A short page.",
+    }]
+
+
+def test_chunk_text_rejects_invalid_configuration():
+    import pytest
+
+    with pytest.raises(ValueError):
+        chunk_text("Some text", max_chars=50)
+    with pytest.raises(ValueError):
+        chunk_text("Some text", max_chars=100, overlap=100)
+
+
+def test_upload_persists_page_aware_chunks():
+    content = ("Chunk retrieval preserves source page references. " * 50).strip()
+    upload = client.post(
+        "/documents/upload",
+        files={"file": ("chunked.pdf", make_pdf(content), "application/pdf")},
+    )
+    assert upload.status_code == 201
+    document_id = upload.json()["document_id"]
+    response = client.get(f"/documents/{document_id}/chunks")
+    assert response.status_code == 200
+    chunks = response.json()
+    assert chunks
+    assert all(item["page_number"] == 1 for item in chunks)
+    assert all(item["document_id"] == document_id for item in chunks)
+    assert all(item["text"] for item in chunks)
+    assert all(item["end_char"] - item["start_char"] == item["character_count"] for item in chunks)
+
+
+def test_chunks_endpoint_returns_404_for_unknown_document():
+    response = client.get("/documents/missing-document/chunks")
+    assert response.status_code == 404
+
+
+def test_deleting_document_cascades_to_chunks():
+    content = ("Delete this document and its chunks together. " * 40).strip()
+    upload = client.post(
+        "/documents/upload",
+        files={"file": ("delete-chunks.pdf", make_pdf(content), "application/pdf")},
+    )
+    document_id = upload.json()["document_id"]
+    assert client.get(f"/documents/{document_id}/chunks").json()
+    assert client.delete(f"/documents/{document_id}").status_code == 200
+    with main.connect_db() as connection:
+        count = connection.execute(
+            "SELECT COUNT(*) FROM document_chunks WHERE document_id = ?",
+            (document_id,),
+        ).fetchone()[0]
+    assert count == 0
