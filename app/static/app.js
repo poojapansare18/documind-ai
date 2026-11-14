@@ -3,14 +3,61 @@ const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 
 async function api(path, options = {}) {
-  const response = await fetch(path, options);
+  const headers = new Headers(options.headers || {});
+  const apiKey = sessionStorage.getItem("documind_api_key");
+  if (apiKey) headers.set("X-API-Key", apiKey);
+  const response = await fetch(path, {...options, headers});
   const contentType = response.headers.get("content-type") || "";
   const payload = contentType.includes("application/json") ? await response.json() : await response.text();
   if (!response.ok) {
     const message = typeof payload === "object" && payload ? payload.detail : payload;
+    if (response.status === 401 && path !== "/auth/status") showAuthOverlay(message);
     throw new Error(message || `Request failed (${response.status})`);
   }
   return payload;
+}
+
+function showAuthOverlay(message = "") {
+  $("#auth-overlay").classList.remove("hidden");
+  $("#lock-button").classList.remove("hidden");
+  setStatus("#auth-status", message, message ? "error" : "");
+  $("#api-key").focus();
+}
+
+function hideAuthOverlay() {
+  $("#auth-overlay").classList.add("hidden");
+  setStatus("#auth-status", "");
+}
+
+async function unlockWorkspace(event) {
+  event.preventDefault();
+  const key = $("#api-key").value.trim();
+  if (!key) return;
+  sessionStorage.setItem("documind_api_key", key);
+  try {
+    await api("/documents");
+    hideAuthOverlay();
+    $("#api-key").value = "";
+    await loadDocuments();
+  } catch (error) {
+    sessionStorage.removeItem("documind_api_key");
+    setStatus("#auth-status", "Access denied. Check the API key and try again.", "error");
+  }
+}
+
+function lockWorkspace() {
+  sessionStorage.removeItem("documind_api_key");
+  state.documents = [];
+  state.selectedId = null;
+  state.askDocumentId = null;
+  state.selected = null;
+  state.pages = [];
+  renderStats();
+  renderDocuments();
+  $("#selected-content").classList.add("hidden");
+  $("#selected-empty").classList.remove("hidden");
+  $("#selected-badge").textContent = "No selection";
+  showAuthOverlay("Workspace locked.");
 }
 
 function setStatus(selector, message = "", type = "") {
@@ -353,7 +400,8 @@ function bindEvents() {
   $("#tables-button").addEventListener("click", () => { showView("tables"); loadTables(); });
   $("#refresh-tables").addEventListener("click", loadTables);
   $("#delete-button").addEventListener("click", deleteSelectedDocument);
-  $("#clear-ask-scope").addEventListener("click", () => {
+  $("#auth-form").addEventListener("submit", unlockWorkspace);
+  $("#lock-button").addEventListener("click", lockWorkspace);\n  $("#clear-ask-scope").addEventListener("click", () => {
     state.askDocumentId = null;
     $("#ask-scope").textContent = "All indexed documents";
     $("#ask-scope-hint").textContent = "Questions will search across every indexed document.";
@@ -363,9 +411,16 @@ function bindEvents() {
 async function init() {
   bindEvents();
   try {
+    const auth = await api("/auth/status");
+    $("#lock-button").classList.toggle("hidden", !auth.api_key_required);
+    if (auth.api_key_required && !sessionStorage.getItem("documind_api_key")) {
+      showAuthOverlay();
+      return;
+    }
     await loadDocuments();
   } catch (error) {
-    setStatus("#upload-status", `Could not load document library: ${error.message}`, "error");
+    if (error.message.toLowerCase().includes("api key")) showAuthOverlay(error.message);
+    else setStatus("#upload-status", `Could not load document library: ${error.message}`, "error");
   }
 }
 document.addEventListener("DOMContentLoaded", init);
