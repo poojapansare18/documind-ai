@@ -130,8 +130,19 @@ This endpoint requires `OPENAI_API_KEY`; the default model is `gpt-5.5`, configu
 
 ## Next milestones
 
-1. Improve table reconstruction for merged cells, multiline rows, and page-spanning tables.
-2. Add authentication, observability, and deployment hardening.
+1. Expand the retrieval benchmark with permission-cleared real documents and manually reviewed relevance labels.
+2. Add answer-level evaluation for factual support, citation entailment, and abstention quality.
+3. Add multi-user identity and role-based access control, then move larger corpora to a dedicated vector database.
+
+## Retrieval evaluation
+
+DocuMind includes a repeatable page-level semantic retrieval benchmark. It generates a synthetic three-page travel policy, uploads and indexes it through the API, runs five queries with known relevant pages, and reports Precision@k, Recall@k, MRR@k, and nDCG@k. Run it with:
+
+```powershell
+python scripts/evaluate_retrieval.py --k 3 --report evaluation/results.json
+```
+
+The first run may download the local embedding model. The benchmark is a synthetic engineering baseline, not an industry dataset. It measures page retrieval only; it does not establish answer factuality or citation entailment. See [evaluation/README.md](evaluation/README.md) for metric definitions and limitations.
 
 ## Security notes
 
