@@ -48,8 +48,24 @@ class SearchRequest(BaseModel):
 class SearchResult(BaseModel):
     document_id: str
     filename: str
+    page_number: int
     snippet: str
     score: int
+
+
+class DocumentDetail(BaseModel):
+    document_id: str
+    filename: str
+    page_count: int
+    character_count: int
+    created_at: str
+
+
+class DocumentPageResponse(BaseModel):
+    document_id: str
+    page_number: int
+    character_count: int
+    text: str
 
 
 class SummaryResponse(BaseModel):
@@ -87,6 +103,18 @@ def init_db() -> None:
             )
             """
         )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS document_pages (
+                page_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                document_id TEXT NOT NULL REFERENCES documents(document_id) ON DELETE CASCADE,
+                page_number INTEGER NOT NULL,
+                extracted_text TEXT NOT NULL,
+                UNIQUE(document_id, page_number)
+            )
+            """
+        )
+        connection.execute("CREATE INDEX IF NOT EXISTS idx_document_pages_document_id ON document_pages(document_id)")
         connection.commit()
 
 
@@ -94,7 +122,7 @@ def init_db() -> None:
 init_db()
 
 
-def extract_pdf(data: bytes) -> tuple[str, int]:
+def extract_pdf(data: bytes) -> tuple[list[str], int]:
     try:
         with fitz.open(stream=data, filetype="pdf") as pdf:
             if pdf.is_encrypted:
@@ -103,13 +131,13 @@ def extract_pdf(data: bytes) -> tuple[str, int]:
                 raise HTTPException(status_code=422, detail="The PDF contains no pages.")
             if len(pdf) > MAX_PDF_PAGES:
                 raise HTTPException(status_code=413, detail=f"PDF exceeds the {MAX_PDF_PAGES}-page limit.")
-            text = "\n\n".join(page.get_text("text") for page in pdf).strip()
-            if not text:
+            page_texts = [page.get_text("text").strip() for page in pdf]
+            if not any(page_texts):
                 raise HTTPException(
                     status_code=422,
                     detail="No selectable text was found. Scanned PDFs require OCR, which is not included in this version.",
                 )
-            return text, len(pdf)
+            return page_texts, len(pdf)
     except HTTPException:
         raise
     except Exception as exc:
@@ -193,19 +221,24 @@ async def upload_document(file: Annotated[UploadFile, File(description="A text-b
         raise HTTPException(status_code=413, detail="File exceeds the 10 MB limit.")
     if not data.startswith(b"%PDF-"):
         raise HTTPException(status_code=415, detail="The file does not have a valid PDF signature.")
-    extracted_text, pages = extract_pdf(data)
+    page_texts, page_count = extract_pdf(data)
+    extracted_text = "\n\n".join(page_texts).strip()
     document_id = str(uuid.uuid4())
     with closing(connect_db()) as connection:
         connection.execute(
             "INSERT INTO documents (document_id, filename, extracted_text, page_count, character_count) "
             "VALUES (?, ?, ?, ?, ?)",
-            (document_id, filename, extracted_text, pages, len(extracted_text)),
+            (document_id, filename, extracted_text, page_count, len(extracted_text)),
+        )
+        connection.executemany(
+            "INSERT INTO document_pages (document_id, page_number, extracted_text) VALUES (?, ?, ?)",
+            [(document_id, index, page_text) for index, page_text in enumerate(page_texts, start=1)],
         )
         connection.commit()
     return DocumentResponse(
         document_id=document_id,
         filename=filename,
-        page_count=pages,
+        page_count=page_count,
         character_count=len(extracted_text),
     )
 
@@ -218,6 +251,38 @@ def list_documents() -> list[DocumentListItem]:
             "FROM documents ORDER BY created_at DESC, rowid DESC"
         ).fetchall()
     return [DocumentListItem(**dict(row)) for row in rows]
+
+
+@app.get("/documents/{document_id}", response_model=DocumentDetail)
+def get_document_details(document_id: str) -> DocumentDetail:
+    doc = get_document(document_id)
+    return DocumentDetail(
+        document_id=doc["document_id"],
+        filename=doc["filename"],
+        page_count=doc["page_count"],
+        character_count=doc["character_count"],
+        created_at=doc["created_at"],
+    )
+
+
+@app.get("/documents/{document_id}/pages", response_model=list[DocumentPageResponse])
+def get_document_pages(document_id: str) -> list[DocumentPageResponse]:
+    get_document(document_id)
+    with closing(connect_db()) as connection:
+        rows = connection.execute(
+            "SELECT document_id, page_number, extracted_text FROM document_pages "
+            "WHERE document_id = ? ORDER BY page_number",
+            (document_id,),
+        ).fetchall()
+    return [
+        DocumentPageResponse(
+            document_id=row["document_id"],
+            page_number=row["page_number"],
+            character_count=len(row["extracted_text"]),
+            text=row["extracted_text"],
+        )
+        for row in rows
+    ]
 
 
 @app.get("/documents/{document_id}/summary", response_model=SummaryResponse)
@@ -233,6 +298,7 @@ def summarize_document(document_id: str) -> SummaryResponse:
 @app.delete("/documents/{document_id}")
 def delete_document(document_id: str) -> dict[str, str]:
     with closing(connect_db()) as connection:
+        connection.execute("DELETE FROM document_pages WHERE document_id = ?", (document_id,))
         cursor = connection.execute("DELETE FROM documents WHERE document_id = ?", (document_id,))
         connection.commit()
     if cursor.rowcount == 0:
@@ -247,11 +313,12 @@ def search_documents(request: SearchRequest) -> list[SearchResult]:
         raise HTTPException(status_code=422, detail="Search query must contain at least one meaningful term.")
     with closing(connect_db()) as connection:
         rows = connection.execute(
-            "SELECT document_id, filename, extracted_text FROM documents"
+            "SELECT p.document_id, d.filename, p.page_number, p.extracted_text "
+            "FROM document_pages p JOIN documents d ON d.document_id = p.document_id"
         ).fetchall()
     results: list[SearchResult] = []
-    for doc in rows:
-        paragraphs = [part.strip() for part in re.split(r"\n\s*\n", doc["extracted_text"]) if part.strip()]
+    for page in rows:
+        paragraphs = [part.strip() for part in re.split(r"\n\s*\n", page["extracted_text"]) if part.strip()]
         for paragraph in paragraphs:
             lowered = paragraph.lower()
             score = sum(lowered.count(term) for term in terms)
@@ -259,8 +326,9 @@ def search_documents(request: SearchRequest) -> list[SearchResult]:
                 snippet = paragraph[:500] + ("…" if len(paragraph) > 500 else "")
                 results.append(
                     SearchResult(
-                        document_id=doc["document_id"],
-                        filename=doc["filename"],
+                        document_id=page["document_id"],
+                        filename=page["filename"],
+                        page_number=page["page_number"],
                         snippet=snippet,
                         score=score,
                     )
