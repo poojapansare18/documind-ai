@@ -749,3 +749,17 @@ def test_uploaded_two_column_pdf_exposes_layout_classification():
     assert pages.json()[0]["layout_type"] == "two_column"
     assert pages.json()[0]["column_count"] == 2
     assert pages.json()[0]["text"].index("LEFT COLUMN THIRD") < pages.json()[0]["text"].index("RIGHT COLUMN FIRST")
+
+
+
+def test_document_workbench_home_and_static_assets_load():
+    home = client.get("/")
+    assert home.status_code == 200
+    assert "Document workspace" in home.text
+    assert "/static/app.css" in home.text
+    assert "/static/app.js" in home.text
+    assert client.get("/static/app.css").status_code == 200
+    script = client.get("/static/app.js")
+    assert script.status_code == 200
+    assert "runAsk" in script.text
+    assert client.get("/static/../../app/main.py").status_code == 404
