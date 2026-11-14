@@ -531,6 +531,9 @@ def test_extract_page_text_uses_ocr_for_image_only_page():
         def get_images(self, full=True):
             return [(1, 0, 100, 100, 8, "DeviceRGB", "", "Im1", "DCTDecode", 0)]
 
+        def get_drawings(self):
+            return []
+
         def get_textpage_ocr(self, language, dpi, full):
             assert language == main.OCR_LANGUAGE
             assert dpi == main.OCR_DPI
@@ -569,6 +572,9 @@ def test_extract_page_text_returns_clear_error_when_ocr_engine_is_missing():
             return ""
 
         def get_images(self, full=True):
+            return [(1, 0, 100, 100, 8, "DeviceRGB", "", "Im1", "DCTDecode", 0)]
+
+        def get_drawings(self):
             return []
 
         def get_textpage_ocr(self, **kwargs):
@@ -607,3 +613,24 @@ def test_page_api_exposes_ocr_provenance(monkeypatch):
     assert pages.json()[0]["extraction_method"] == "ocr"
     assert pages.json()[0]["ocr_applied"] is True
     assert pages.json()[0]["text"] == "Recognised scanned page content."
+
+
+
+def test_extract_page_text_does_not_ocr_a_blank_page():
+    class FakePage:
+        def get_text(self, option, textpage=None):
+            return ""
+
+        def get_images(self, full=True):
+            return []
+
+        def get_drawings(self):
+            return []
+
+        def get_textpage_ocr(self, **kwargs):
+            raise AssertionError("A blank page should not trigger OCR.")
+
+    text, text_page, method = main.extract_page_text(FakePage())
+    assert text == ""
+    assert text_page is None
+    assert method == "native"
