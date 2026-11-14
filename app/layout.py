@@ -188,7 +188,7 @@ def detect_table_candidates(
 
         first_row_text = [cell["text"] for cell in normalised_rows[0]["cells"]]
         first_row_looks_like_header = (
-            all(any(character.isalpha() for character in text) for text in first_row_text)
+            all(any(character.isalpha() for character in text) and not any(character.isdigit() for character in text) for text in first_row_text)
             and any(
                 any(character.isdigit() for cell in row["cells"] for character in cell["text"])
                 for row in normalised_rows[1:]
