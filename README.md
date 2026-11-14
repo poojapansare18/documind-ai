@@ -2,7 +2,7 @@
 
 A document-intelligence API and lightweight web interface that accepts text-based PDFs, extracts their text, creates extractive summaries, and searches uploaded documents.
 
-> **Current scope:** MVP 0.5. Summaries are extractive (selected from the source text), not LLM-generated. Uploaded document text and metadata are stored in a local SQLite database. Scanned PDFs and OCR are not supported yet.
+> **Current scope:** MVP 0.6. Summaries are extractive (selected from the source text), not LLM-generated. Uploaded document text and metadata are stored in a local SQLite database. Scanned PDFs and OCR are not supported yet.
 
 ## Features
 
@@ -16,6 +16,8 @@ A document-intelligence API and lightweight web interface that accepts text-base
 - PDF text-block geometry: bounding boxes, line-level coordinates, span-level coordinates, font names, and font sizes
 - Word-level coordinates and heuristic table-candidate detection
 - Persisted, overlapping page-aware text chunks with exact character offsets
+- Local dense embeddings using FastEmbed and the BAAI/bge-small-en-v1.5 model
+- Explicit document indexing and semantic search with page-level provenance
 - Layout inspection endpoint for page-by-page text blocks
 - Document listing and deletion
 - FastAPI endpoints and interactive Swagger documentation
@@ -34,7 +36,10 @@ flowchart TD
     E --> H[Document and page retrieval]
     E --> I[Layout-aware chunking]
     I --> J[Chunk retrieval with page and character offsets]
-    E --> K[List / delete documents]
+    E --> K[Local embedding generation]
+    K --> L[SQLite vector store]
+    L --> M[Cosine similarity search]
+    E --> N[List / delete documents]
 ```
 
 ## Run locally
@@ -53,7 +58,7 @@ Open:
 - Swagger UI: http://127.0.0.1:8000/docs
 - Health check: http://127.0.0.1:8000/health
 
-The default SQLite database is created at `data/documind.db`. Set `DOCUMIND_DB_PATH` to use another location.
+The default SQLite database is created at `data/documind.db`. Set `DOCUMIND_DB_PATH` to use another location. FastEmbed downloads its default model on the first indexing request and caches it locally. Set `DOCUMIND_EMBEDDING_MODEL` to select another supported model and `FASTEMBED_CACHE_PATH` to change the model cache directory.
 
 ## Run tests
 
@@ -73,6 +78,8 @@ python -m pytest -v
 | GET | `/documents/{document_id}/layout` | Retrieve text blocks with page coordinates and font metadata |
 | GET | `/documents/{document_id}/tables` | Return heuristic table candidates by page |
 | GET | `/documents/{document_id}/chunks` | Retrieve persisted text chunks with page and character offsets |
+| POST | `/documents/{document_id}/index` | Generate and persist local embeddings for a document's chunks |
+| POST | `/documents/semantic-search` | Search indexed chunks by semantic similarity, with page provenance |
 | GET | `/documents/{document_id}/summary` | Return an extractive summary |
 | DELETE | `/documents/{document_id}` | Delete a saved document |
 | POST | `/documents/search` | Search saved documents by keyword; results include page numbers |
@@ -87,14 +94,13 @@ The layout endpoint preserves text-block bounding boxes, page dimensions, block 
 
 Text is split independently on each page into chunks of up to 1,200 characters with a 150-character overlap. The splitter prefers paragraph, sentence, and word boundaries. Each chunk stores its page number, zero-based start offset, end-exclusive offset, and text. These references allow later retrieval results to point back to their original page and exact text range. Existing documents are backfilled into the chunk table when the application starts.
 
-Chunking is a deterministic preprocessing step; it does not create embeddings or perform semantic search.
+Chunking is a deterministic preprocessing step. Semantic indexing uses FastEmbed's local ONNX runtime with `BAAI/bge-small-en-v1.5` (384 dimensions by default). The first indexing request downloads the model; subsequent requests reuse the local cache. No hosted embedding API key is required. See the [FastEmbed quickstart](https://qdrant.github.io/fastembed/Getting%20Started/) for model and runtime details.\n\nTo index a document, call `POST /documents/{document_id}/index`. Then call `POST /documents/semantic-search` with a query. Search results include the source document, page, chunk index, character offsets, and cosine-similarity score. The current vector store is SQLite JSON plus an in-process cosine scan. This is appropriate for a small portfolio MVP, not for large-scale production retrieval; a dedicated vector database can replace it later.
 
 ## Next milestones
 
 1. Improve table reconstruction and infer reading order for multi-column pages.
-2. Add embedding generation and vector retrieval over persisted chunks.
-3. Add grounded RAG answers with page and chunk citations.
-4. Add OCR, authentication, observability, and deployment hardening.
+2. Add grounded RAG answers with page and chunk citations.
+3. Add OCR, authentication, observability, and deployment hardening.
 
 ## Security notes
 
