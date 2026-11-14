@@ -211,7 +211,7 @@ def reconstruct_reading_order(
     ordered_text.extend(line["text"] for line in remaining_left)
     ordered_text.extend(line["text"] for line in remaining_right)
     return {
-        "text": "\\n".join(text for text in ordered_text if text),
+        "text": "\n".join(text for text in ordered_text if text),
         "layout_type": "two_column",
         "column_count": 2,
     }
