@@ -61,22 +61,23 @@ def detect_table_candidates(
     minimum_rows: int = 2,
     maximum_row_gap: float = 36.0,
     minimum_cell_gap: float = 18.0,
+    maximum_continuation_gap: float = 18.0,
+    column_alignment_tolerance: float = 24.0,
 ) -> list[dict]:
-    """Detect repeated, horizontally separated text rows as table candidates.
+    """Detect and reconstruct table candidates from word-level PDF geometry.
 
-    This is a geometry heuristic, not a universal PDF table parser. It returns
-    only candidates with repeated rows and reasonably aligned column starts.
+    Repeated aligned rows form the table skeleton. Short lines between those
+    rows may be merged into the preceding cell as wrapped cell content.
+    Column indexes and spans describe missing or merged cells without
+    fabricating empty text. This remains a geometry heuristic.
     """
-    candidate_rows = []
+    all_rows = []
     for line in _group_words_into_lines(words):
         cells = _split_line_into_cells(line["words"], minimum_gap=minimum_cell_gap)
-        if len(cells) < minimum_columns:
-            continue
-        candidate_rows.append({
-            "y": line["y"],
-            "cells": cells,
-        })
+        if cells:
+            all_rows.append({"y": line["y"], "cells": cells})
 
+    candidate_rows = [row for row in all_rows if len(row["cells"]) >= minimum_columns]
     if len(candidate_rows) < minimum_rows:
         return []
 
@@ -86,14 +87,12 @@ def detect_table_candidates(
         previous = current[-1]
         vertical_gap = row["y"] - previous["y"]
         shared_columns = min(len(row["cells"]), len(previous["cells"]))
-        alignment = 0.0
-        if shared_columns:
-            differences = [
-                abs(row["cells"][index]["bbox"][0] - previous["cells"][index]["bbox"][0])
-                for index in range(shared_columns)
-            ]
-            alignment = sum(differences) / len(differences)
-        if vertical_gap <= maximum_row_gap and alignment <= 24.0:
+        differences = [
+            abs(row["cells"][index]["bbox"][0] - previous["cells"][index]["bbox"][0])
+            for index in range(shared_columns)
+        ]
+        alignment = sum(differences) / len(differences) if differences else float("inf")
+        if vertical_gap <= maximum_row_gap and alignment <= column_alignment_tolerance:
             current.append(row)
         else:
             if len(current) >= minimum_rows:
@@ -104,7 +103,90 @@ def detect_table_candidates(
 
     tables = []
     for group in groups:
-        column_count = max(len(row["cells"]) for row in group)
+        merged_rows = [
+            {
+                "y": row["y"],
+                "cells": [
+                    {"text": cell["text"], "bbox": list(cell["bbox"])}
+                    for cell in row["cells"]
+                ],
+            }
+            for row in group
+        ]
+
+        # Attach short wrapped lines to the nearest aligned cell in the row
+        # immediately above. Do not merge lines that are too far away.
+        for row_index, row in enumerate(merged_rows):
+            next_row_y = (
+                merged_rows[row_index + 1]["y"]
+                if row_index + 1 < len(merged_rows)
+                else row["y"] + maximum_continuation_gap
+            )
+            continuation_lines = [
+                line for line in all_rows
+                if row["y"] < line["y"] < next_row_y
+                and len(line["cells"]) < minimum_columns
+                and line["y"] - row["y"] <= maximum_continuation_gap
+            ]
+            for continuation in continuation_lines:
+                for continuation_cell in continuation["cells"]:
+                    nearest_index = min(
+                        range(len(row["cells"])),
+                        key=lambda index: abs(
+                            row["cells"][index]["bbox"][0] - continuation_cell["bbox"][0]
+                        ),
+                    )
+                    target = row["cells"][nearest_index]
+                    if abs(target["bbox"][0] - continuation_cell["bbox"][0]) > column_alignment_tolerance:
+                        continue
+                    target["text"] = f'{target["text"]}\n{continuation_cell["text"]}'
+                    target["bbox"] = [
+                        min(target["bbox"][0], continuation_cell["bbox"][0]),
+                        min(target["bbox"][1], continuation_cell["bbox"][1]),
+                        max(target["bbox"][2], continuation_cell["bbox"][2]),
+                        max(target["bbox"][3], continuation_cell["bbox"][3]),
+                    ]
+
+        column_count = max(len(row["cells"]) for row in merged_rows)
+        column_starts = []
+        for column_index in range(column_count):
+            starts = [
+                row["cells"][column_index]["bbox"][0]
+                for row in merged_rows
+                if len(row["cells"]) > column_index
+            ]
+            column_starts.append(round(median(starts), 2))
+
+        normalised_rows = []
+        for row in merged_rows:
+            cells = []
+            for cell in row["cells"]:
+                column_index = min(
+                    range(len(column_starts)),
+                    key=lambda index: abs(column_starts[index] - cell["bbox"][0]),
+                )
+                covered_columns = [
+                    index for index, start_x in enumerate(column_starts)
+                    if cell["bbox"][0] - column_alignment_tolerance <= start_x <= cell["bbox"][2]
+                ]
+                column_span = max(1, len(covered_columns))
+                cells.append({
+                    "text": cell["text"],
+                    "bbox": cell["bbox"],
+                    "column_index": column_index,
+                    "column_span": column_span,
+                })
+            normalised_rows.append({"cells": cells})
+
+        first_row_text = [cell["text"] for cell in normalised_rows[0]["cells"]]
+        first_row_looks_like_header = (
+            all(any(character.isalpha() for character in text) for text in first_row_text)
+            and any(
+                any(character.isdigit() for cell in row["cells"] for character in cell["text"])
+                for row in normalised_rows[1:]
+            )
+        )
+
         row_alignments = []
         for previous, current_row in zip(group, group[1:]):
             shared = min(len(previous["cells"]), len(current_row["cells"]))
@@ -114,17 +196,18 @@ def detect_table_candidates(
                     for index in range(shared)
                 ]
                 row_alignments.append(sum(deltas) / len(deltas))
-        mean_alignment = sum(row_alignments) / len(row_alignments) if row_alignments else 24.0
-        alignment_score = max(0.0, 1.0 - mean_alignment / 24.0)
-        confidence = min(0.95, 0.55 + min(len(group) - minimum_rows, 4) * 0.05 + alignment_score * 0.15)
+        mean_alignment = sum(row_alignments) / len(row_alignments) if row_alignments else column_alignment_tolerance
+        alignment_score = max(0.0, 1.0 - mean_alignment / column_alignment_tolerance)
+        row_score = min(len(group) - minimum_rows, 4) * 0.05
+        confidence = min(0.95, 0.55 + row_score + alignment_score * 0.15)
+
         tables.append({
-            "row_count": len(group),
+            "row_count": len(merged_rows),
             "column_count": column_count,
+            "column_starts": column_starts,
+            "header_row_index": 0 if first_row_looks_like_header else None,
             "confidence": round(confidence, 2),
-            "rows": [
-                {"cells": row["cells"]}
-                for row in group
-            ],
+            "rows": normalised_rows,
         })
     return tables
 
