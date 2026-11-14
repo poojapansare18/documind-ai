@@ -17,6 +17,7 @@ def make_pdf(text: str) -> bytes:
 
 def setup_function():
     with main.connect_db() as connection:
+        connection.execute("DELETE FROM document_pages")
         connection.execute("DELETE FROM documents")
         connection.commit()
 
@@ -123,3 +124,54 @@ def test_upload_rejects_wrong_pdf_content_type():
         files={"file": ("wrong.pdf", b"%PDF-1.4", "text/plain")},
     )
     assert response.status_code == 415
+
+
+
+def test_upload_persists_page_level_text():
+    content = "Page-level extraction keeps source locations available for retrieval."
+    upload = client.post(
+        "/documents/upload",
+        files={"file": ("pages.pdf", make_pdf(content), "application/pdf")},
+    )
+    assert upload.status_code == 201
+    document_id = upload.json()["document_id"]
+    pages = client.get(f"/documents/{document_id}/pages")
+    assert pages.status_code == 200
+    assert len(pages.json()) == 1
+    assert pages.json()[0]["page_number"] == 1
+    assert content in pages.json()[0]["text"]
+
+
+def test_document_detail_returns_metadata():
+    upload = client.post(
+        "/documents/upload",
+        files={"file": ("detail.pdf", make_pdf("Document metadata is available."), "application/pdf")},
+    )
+    document_id = upload.json()["document_id"]
+    detail = client.get(f"/documents/{document_id}")
+    assert detail.status_code == 200
+    assert detail.json()["filename"] == "detail.pdf"
+    assert detail.json()["page_count"] == 1
+    assert detail.json()["created_at"]
+
+
+def test_search_results_include_page_number():
+    upload = client.post(
+        "/documents/upload",
+        files={"file": ("source.pdf", make_pdf("Semantic retrieval needs traceable source references."), "application/pdf")},
+    )
+    response = client.post("/documents/search", json={"query": "traceable source"})
+    assert response.status_code == 200
+    assert response.json()[0]["document_id"] == upload.json()["document_id"]
+    assert response.json()[0]["page_number"] == 1
+
+
+def test_deleting_document_removes_its_pages():
+    upload = client.post(
+        "/documents/upload",
+        files={"file": ("remove-pages.pdf", make_pdf("Page records should be removed with their document."), "application/pdf")},
+    )
+    document_id = upload.json()["document_id"]
+    assert client.get(f"/documents/{document_id}/pages").json()
+    assert client.delete(f"/documents/{document_id}").status_code == 200
+    assert client.get(f"/documents/{document_id}/pages").status_code == 404
