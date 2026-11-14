@@ -127,3 +127,74 @@ def detect_table_candidates(
             ],
         })
     return tables
+
+def reconstruct_reading_order(
+    words: list[dict],
+    page_width: float,
+    fallback_text: str = "",
+    gutter_tolerance: float = 12.0,
+    minimum_column_lines: int = 2,
+) -> dict:
+    """Reorder clear two-column pages as left column then right column.
+
+    Full-width lines split the page into vertical reading bands. Pages without
+    enough evidence for two columns retain PyMuPDF's native text order.
+    """
+    lines = _group_words_into_lines(words)
+    records = []
+    for line in lines:
+        line_words = line["words"]
+        if not line_words:
+            continue
+        x0 = min(float(word.get("x0", 0)) for word in line_words)
+        x1 = max(float(word.get("x1", 0)) for word in line_words)
+        records.append({
+            "y": float(line["y"]),
+            "x0": x0,
+            "x1": x1,
+            "text": " ".join(str(word.get("text", "")) for word in line_words).strip(),
+        })
+
+    midpoint = float(page_width) / 2.0
+    left_lines = []
+    right_lines = []
+    spanning_lines = []
+    for line in records:
+        if line["x1"] <= midpoint - gutter_tolerance:
+            left_lines.append(line)
+        elif line["x0"] >= midpoint + gutter_tolerance:
+            right_lines.append(line)
+        elif line["x0"] < midpoint - gutter_tolerance and line["x1"] > midpoint + gutter_tolerance:
+            spanning_lines.append(line)
+        elif (line["x0"] + line["x1"]) / 2.0 < midpoint:
+            left_lines.append(line)
+        else:
+            right_lines.append(line)
+
+    if len(left_lines) < minimum_column_lines or len(right_lines) < minimum_column_lines:
+        return {
+            "text": fallback_text,
+            "layout_type": "single_column",
+            "column_count": 1,
+        }
+
+    ordered_text = []
+    remaining_left = sorted(left_lines, key=lambda item: item["y"])
+    remaining_right = sorted(right_lines, key=lambda item: item["y"])
+    for spanning in sorted(spanning_lines, key=lambda item: item["y"]):
+        band_left = [line for line in remaining_left if line["y"] < spanning["y"]]
+        band_right = [line for line in remaining_right if line["y"] < spanning["y"]]
+        ordered_text.extend(line["text"] for line in band_left)
+        ordered_text.extend(line["text"] for line in band_right)
+        remaining_left = [line for line in remaining_left if line["y"] >= spanning["y"]]
+        remaining_right = [line for line in remaining_right if line["y"] >= spanning["y"]]
+        ordered_text.append(spanning["text"])
+
+    ordered_text.extend(line["text"] for line in remaining_left)
+    ordered_text.extend(line["text"] for line in remaining_right)
+    return {
+        "text": "\\n".join(text for text in ordered_text if text),
+        "layout_type": "two_column",
+        "column_count": 2,
+    }
+
