@@ -14,12 +14,12 @@ sys.path.insert(0, str(ROOT))
 load_dotenv(ROOT / ".env")
 
 from app.evaluation import evaluate_retrieval
-from create_evaluation_corpus import create_corpus
+from scripts.create_evaluation_corpus import create_corpus
 
 
 def run_benchmark(base_url: str, benchmark_path: Path, k: int | None = None) -> dict:
     benchmark = json.loads(benchmark_path.read_text(encoding="utf-8"))
-    top_k = k or int(benchmark.get("k", 5))
+    top_k = int(benchmark.get("k", 5)) if k is None else k
     corpus_path = benchmark_path.parent / benchmark["corpus_path"]
     if not corpus_path.exists():
         create_corpus(corpus_path)
