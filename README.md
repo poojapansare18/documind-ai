@@ -2,7 +2,7 @@
 
 A document-intelligence API and lightweight web interface that accepts text-based PDFs, extracts their text, creates extractive summaries, and searches uploaded documents.
 
-> **Current scope:** MVP 0.4. Summaries are extractive (selected from the source text), not LLM-generated. Uploaded document text and metadata are stored in a local SQLite database. Scanned PDFs and OCR are not supported yet.
+> **Current scope:** MVP 0.5. Summaries are extractive (selected from the source text), not LLM-generated. Uploaded document text and metadata are stored in a local SQLite database. Scanned PDFs and OCR are not supported yet.
 
 ## Features
 
@@ -15,6 +15,7 @@ A document-intelligence API and lightweight web interface that accepts text-base
 - Page-aware keyword search results with source locations
 - PDF text-block geometry: bounding boxes, line-level coordinates, span-level coordinates, font names, and font sizes
 - Word-level coordinates and heuristic table-candidate detection
+- Persisted, overlapping page-aware text chunks with exact character offsets
 - Layout inspection endpoint for page-by-page text blocks
 - Document listing and deletion
 - FastAPI endpoints and interactive Swagger documentation
@@ -31,7 +32,7 @@ flowchart TD
     E --> F[Extractive summary]
     E --> G[Page-aware keyword search]
     E --> H[Document and page retrieval]
-    E --> I[List / delete documents]
+    E --> I[Layout-aware chunking]\n    I --> J[Chunk retrieval with page and character offsets]\n    E --> K[List / delete documents]
 ```
 
 ## Run locally
@@ -68,7 +69,7 @@ python -m pytest -v
 | GET | `/documents/{document_id}` | Retrieve document metadata |
 | GET | `/documents/{document_id}/pages` | Retrieve extracted text by page |
 | GET | `/documents/{document_id}/layout` | Retrieve text blocks with page coordinates and font metadata |
-| GET | `/documents/{document_id}/tables` | Return heuristic table candidates by page |
+| GET | `/documents/{document_id}/tables` | Return heuristic table candidates by page |\n| GET | `/documents/{document_id}/chunks` | Retrieve persisted text chunks with page and character offsets |
 | GET | `/documents/{document_id}/summary` | Return an extractive summary |
 | DELETE | `/documents/{document_id}` | Delete a saved document |
 | POST | `/documents/search` | Search saved documents by keyword; results include page numbers |
