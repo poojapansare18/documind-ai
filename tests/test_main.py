@@ -234,3 +234,16 @@ def test_table_candidate_detection_ignores_single_paragraph_line():
         {"x0": 135, "y0": 10, "x1": 175, "y1": 20, "text": "text", "block_no": 0, "line_no": 0, "word_no": 3},
     ]
     assert detect_table_candidates(words) == []
+
+
+def test_document_tables_endpoint_returns_page_results():
+    upload = client.post(
+        "/documents/upload",
+        files={"file": ("plain.pdf", make_pdf("This is a simple paragraph without a table."), "application/pdf")},
+    )
+    document_id = upload.json()["document_id"]
+    response = client.get(f"/documents/{document_id}/tables")
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+    assert response.json()[0]["page_number"] == 1
+    assert response.json()[0]["tables"] == []
