@@ -13,7 +13,7 @@ A document-intelligence API and lightweight web interface that accepts text-base
 - SQLite persistence with page-level text records
 - Document metadata and page retrieval endpoints
 - Page-aware keyword search results with source locations
-- PDF text-block geometry: bounding boxes, line counts, and font metadata
+- PDF text-block geometry: bounding boxes, line-level coordinates, span-level coordinates, font names, and font sizes
 - Layout inspection endpoint for page-by-page text blocks
 - Document listing and deletion
 - FastAPI endpoints and interactive Swagger documentation
@@ -75,7 +75,7 @@ python -m pytest -v
 
 Each uploaded PDF is stored as a document record plus one text record per page. Search results include the page number, making it possible to trace a match back to its source location. Existing documents created before page-level storage are migrated into a page-one record when the application starts.
 
-The layout endpoint preserves text-block bounding boxes, page dimensions, line counts, and font names from PyMuPDF. This is a geometry-preserving foundation for layout analysis, not yet automatic table reconstruction: multi-column layouts and complex tables may still require specialised detection. Scanned PDFs still require OCR.
+The layout endpoint preserves text-block bounding boxes, page dimensions, block and line bounding boxes, span coordinates, font names, and font sizes from PyMuPDF. This is a geometry-preserving foundation for layout analysis, not yet automatic table reconstruction: multi-column layouts and complex tables may still require specialised detection. Scanned PDFs still require OCR.
 
 ## Next milestones
 
