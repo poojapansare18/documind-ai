@@ -29,7 +29,7 @@ load_dotenv()
 app = FastAPI(
     title="DocuMind API",
     description="A document intelligence API for PDF extraction, OCR, structured table extraction, layout-aware reading order, keyword search, semantic retrieval, and grounded question answering.",
-    version="0.10.0",
+    version="0.11.0",
 )
 
 app.middleware("http")(security_middleware)
@@ -514,7 +514,7 @@ def auth_status() -> dict[str, bool]:
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "service": "documind-api", "version": "0.10.0"}
+    return {"status": "ok", "service": "documind-api", "version": "0.11.0"}
 
 
 @app.get("/", response_class=HTMLResponse)
