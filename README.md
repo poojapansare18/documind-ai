@@ -155,6 +155,12 @@ docker compose up --build
 
 The application is then available at http://127.0.0.1:8000. The Docker image includes Tesseract OCR and the English language pack. The SQLite database is stored in the persistent `documind_data` volume, and the local embedding model cache is stored in `documind_models`. Docker Compose passes API keys and model/OCR settings from the local `.env` file into the container.
 
+## Container hardening
+
+The Docker image runs as the non-root `appuser` (UID 10001), creates writable data/model-cache directories before switching users, and includes a health check against `/health`. Docker Compose runs with a read-only root filesystem, a temporary `/tmp`, dropped Linux capabilities, `no-new-privileges`, bounded JSON logs, and persistent volumes for the SQLite database and embedding model cache. The host port is bound to `127.0.0.1`; use a TLS-terminating reverse proxy for remote access.
+
+The `.dockerignore` file excludes local environment files, databases, model caches, tests, and Git metadata from the build context.
+
 ## Continuous integration
 
 GitHub Actions runs the automated test suite on pushes to `main` and `develop`, and on pull requests targeting `main`, using Python 3.11 and 3.12.
