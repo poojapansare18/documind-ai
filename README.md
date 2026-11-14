@@ -32,7 +32,9 @@ flowchart TD
     E --> F[Extractive summary]
     E --> G[Page-aware keyword search]
     E --> H[Document and page retrieval]
-    E --> I[Layout-aware chunking]\n    I --> J[Chunk retrieval with page and character offsets]\n    E --> K[List / delete documents]
+    E --> I[Layout-aware chunking]
+    I --> J[Chunk retrieval with page and character offsets]
+    E --> K[List / delete documents]
 ```
 
 ## Run locally
@@ -69,7 +71,8 @@ python -m pytest -v
 | GET | `/documents/{document_id}` | Retrieve document metadata |
 | GET | `/documents/{document_id}/pages` | Retrieve extracted text by page |
 | GET | `/documents/{document_id}/layout` | Retrieve text blocks with page coordinates and font metadata |
-| GET | `/documents/{document_id}/tables` | Return heuristic table candidates by page |\n| GET | `/documents/{document_id}/chunks` | Retrieve persisted text chunks with page and character offsets |
+| GET | `/documents/{document_id}/tables` | Return heuristic table candidates by page |
+| GET | `/documents/{document_id}/chunks` | Retrieve persisted text chunks with page and character offsets |
 | GET | `/documents/{document_id}/summary` | Return an extractive summary |
 | DELETE | `/documents/{document_id}` | Delete a saved document |
 | POST | `/documents/search` | Search saved documents by keyword; results include page numbers |
