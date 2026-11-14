@@ -22,6 +22,7 @@ from app.embeddings import MODEL_NAME, embed_passages, embed_query
 from app.generation import generate_grounded_answer
 from app.layout import detect_table_candidates, reconstruct_reading_order
 from app.tables import extract_native_tables
+from app.security import security_middleware
 
 load_dotenv()
 
@@ -30,6 +31,8 @@ app = FastAPI(
     description="A document intelligence API for PDF extraction, OCR, structured table extraction, layout-aware reading order, keyword search, semantic retrieval, and grounded question answering.",
     version="0.10.0",
 )
+
+app.middleware("http")(security_middleware)
 
 MAX_FILE_BYTES = 10 * 1024 * 1024
 MAX_PDF_PAGES = 100
@@ -502,6 +505,11 @@ def get_document(document_id: str) -> sqlite3.Row:
     if row is None:
         raise HTTPException(status_code=404, detail="Document not found.")
     return row
+
+
+@app.get("/auth/status")
+def auth_status() -> dict[str, bool]:
+    return {"api_key_required": bool(os.getenv("DOCUMIND_API_KEY"))}
 
 
 @app.get("/health")
