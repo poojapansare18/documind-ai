@@ -40,7 +40,7 @@ def ndcg_at_k(ranked_items: list[str], relevant_items: set[str], k: int) -> floa
     if ideal_hits == 0:
         return 0.0
     ideal_dcg = sum(
-        1.0 / __import__("math").log2(rank + 1)
+        1.0 / math.log2(rank + 1)
         for rank in range(1, ideal_hits + 1)
     )
     return dcg / ideal_dcg
