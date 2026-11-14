@@ -4,23 +4,25 @@ from collections import defaultdict
 from statistics import median
 
 
-def _group_words_into_lines(words: list[dict]) -> list[dict]:
-    grouped: dict[tuple[int, int], list[dict]] = defaultdict(list)
-    for word in words:
-        grouped[(int(word.get("block_no", 0)), int(word.get("line_no", 0)))].append(word)
-
-    lines = []
-    for line_words in grouped.values():
-        ordered = sorted(line_words, key=lambda item: float(item.get("x0", 0)))
-        if not ordered:
-            continue
-        y_values = [float(item.get("y0", 0)) for item in ordered]
-        lines.append({
-            "y": median(y_values),
-            "words": ordered,
-        })
-    return sorted(lines, key=lambda line: line["y"])
-
+def _group_words_into_lines(words: list[dict], y_tolerance: float = 3.5) -> list[dict]:
+    # Group by vertical position rather than PDF block IDs: table cells are
+    # frequently emitted as separate text blocks by PDF generators.
+    ordered = sorted(
+        words,
+        key=lambda item: (float(item.get("y0", 0)), float(item.get("x0", 0))),
+    )
+    lines: list[dict] = []
+    for word in ordered:
+        y = float(word.get("y0", 0))
+        if lines and abs(y - median(lines[-1]["y_values"])) <= y_tolerance:
+            lines[-1]["words"].append(word)
+            lines[-1]["y_values"].append(y)
+        else:
+            lines.append({"y_values": [y], "words": [word]})
+    for line in lines:
+        line["words"].sort(key=lambda item: float(item.get("x0", 0)))
+        line["y"] = median(line.pop("y_values"))
+    return lines
 
 def _split_line_into_cells(words: list[dict], minimum_gap: float = 18.0) -> list[dict]:
     if not words:
