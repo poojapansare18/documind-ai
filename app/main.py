@@ -114,7 +114,7 @@ class TableCell(BaseModel):
     text: str
     bbox: list[float] | None = None
     column_index: int = 0
-    column_span: int = 1
+    column_span: int = 1\n    row_span: int = 1
 
 
 class TableRow(BaseModel):
@@ -680,7 +680,7 @@ def get_document_tables(document_id: str) -> list[DocumentPageTablesResponse]:
                 for column_index, cell in enumerate(row.get("cells", [])):
                     cell.setdefault("bbox", None)
                     cell.setdefault("column_index", column_index)
-                    cell.setdefault("column_span", 1)
+                    cell.setdefault("column_span", 1)\n                    cell.setdefault("row_span", 1)
             normalised.append(candidate)
         page_data.append({
             "document_id": row["document_id"],
