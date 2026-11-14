@@ -38,7 +38,7 @@ def embed_passages(texts: list[str]) -> list[list[float]]:
     if not texts:
         return []
     try:
-        return _to_vectors(get_embedding_model().embed(texts))
+        return _to_vectors(get_embedding_model().passage_embed(texts))
     except RuntimeError:
         raise
     except Exception as exc:
