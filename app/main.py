@@ -85,6 +85,7 @@ STOP_WORDS = {
 def connect_db() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(DB_PATH, timeout=10)
+    connection.execute("PRAGMA foreign_keys = ON")
     connection.row_factory = sqlite3.Row
     return connection
 
@@ -115,6 +116,17 @@ def init_db() -> None:
             """
         )
         connection.execute("CREATE INDEX IF NOT EXISTS idx_document_pages_document_id ON document_pages(document_id)")
+        # Backfill documents created before page-level storage was introduced.
+        connection.execute(
+            """
+            INSERT INTO document_pages (document_id, page_number, extracted_text)
+            SELECT d.document_id, 1, d.extracted_text
+            FROM documents d
+            WHERE NOT EXISTS (
+                SELECT 1 FROM document_pages p WHERE p.document_id = d.document_id
+            )
+            """
+        )
         connection.commit()
 
 
