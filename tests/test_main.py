@@ -175,3 +175,27 @@ def test_deleting_document_removes_its_pages():
     assert client.get(f"/documents/{document_id}/pages").json()
     assert client.delete(f"/documents/{document_id}").status_code == 200
     assert client.get(f"/documents/{document_id}/pages").status_code == 404
+
+
+
+def test_upload_persists_layout_geometry():
+    content = "Layout geometry preserves the position of text on a PDF page."
+    upload = client.post(
+        "/documents/upload",
+        files={"file": ("layout.pdf", make_pdf(content), "application/pdf")},
+    )
+    assert upload.status_code == 201
+    document_id = upload.json()["document_id"]
+    layout = client.get(f"/documents/{document_id}/layout")
+    assert layout.status_code == 200
+    assert len(layout.json()) == 1
+    page = layout.json()[0]
+    assert page["page_width"] > 0
+    assert page["page_height"] > 0
+    assert page["blocks"]
+    assert content in page["blocks"][0]["text"]
+
+
+def test_layout_endpoint_returns_404_for_unknown_document():
+    response = client.get("/documents/unknown-document/layout")
+    assert response.status_code == 404
