@@ -12,7 +12,7 @@ services:
       FASTEMBED_CACHE_PATH: ${FASTEMBED_CACHE_PATH:-fastembed_cache}
       DOCUMIND_OCR_LANGUAGE: ${DOCUMIND_OCR_LANGUAGE:-eng}
       DOCUMIND_OCR_DPI: ${DOCUMIND_OCR_DPI:-200}
-      TESSDATA_PREFIX: ${TESSDATA_PREFIX:-}
+      TESSDATA_PREFIX: ${TESSDATA_PREFIX:-/usr/share/tesseract-ocr/5/tessdata}
     volumes:
       - documind_data:/app/data
       - documind_models:/app/fastembed_cache
