@@ -193,7 +193,11 @@ def test_upload_persists_layout_geometry():
     assert page["page_width"] > 0
     assert page["page_height"] > 0
     assert page["blocks"]
-    assert content in page["blocks"][0]["text"]
+    block = page["blocks"][0]
+    assert content in block["text"]
+    assert block["lines"]
+    assert block["lines"][0]["spans"]
+    assert block["lines"][0]["spans"][0]["font_size"] > 0
 
 
 def test_layout_endpoint_returns_404_for_unknown_document():
