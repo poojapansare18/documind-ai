@@ -28,7 +28,7 @@ load_dotenv()
 app = FastAPI(
     title="DocuMind API",
     description="A document intelligence API for PDF extraction, OCR, layout-aware reading order, keyword search, semantic retrieval, and grounded question answering.",
-    version="1.0.0",
+    version="0.10.0",
 )
 
 MAX_FILE_BYTES = 10 * 1024 * 1024
@@ -675,6 +675,12 @@ def get_document_tables(document_id: str) -> list[DocumentPageTablesResponse]:
             candidate.setdefault("continues_from_previous_page", False)
             candidate.setdefault("continues_on_next_page", False)
             candidate.setdefault("continuation_group", None)
+            for row_index, row in enumerate(candidate.get("rows", [])):
+                row.setdefault("row_index", row_index)
+                for column_index, cell in enumerate(row.get("cells", [])):
+                    cell.setdefault("bbox", None)
+                    cell.setdefault("column_index", column_index)
+                    cell.setdefault("column_span", 1)
             normalised.append(candidate)
         page_data.append({
             "document_id": row["document_id"],
