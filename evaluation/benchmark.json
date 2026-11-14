@@ -1,0 +1,33 @@
+{
+  "benchmark_name": "Synthetic Corporate Travel Policy",
+  "corpus_filename": "documind_travel_policy_benchmark.pdf",
+  "corpus_path": "sample_travel_policy.pdf",
+  "k": 3,
+  "queries": [
+    {
+      "id": "flight-booking-window",
+      "query": "How many days in advance should employees book economy flights?",
+      "relevant_pages": [1]
+    },
+    {
+      "id": "hotel-reimbursement-limit",
+      "query": "What is the maximum hotel reimbursement per night?",
+      "relevant_pages": [2]
+    },
+    {
+      "id": "meal-allowance",
+      "query": "What is the daily meal allowance for employees?",
+      "relevant_pages": [2]
+    },
+    {
+      "id": "expense-submission-deadline",
+      "query": "How soon after a trip must employees submit expense claims?",
+      "relevant_pages": [3]
+    },
+    {
+      "id": "late-claim-approval",
+      "query": "Who must approve expense claims submitted after thirty calendar days?",
+      "relevant_pages": [3]
+    }
+  ]
+}
