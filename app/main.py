@@ -114,7 +114,8 @@ class TableCell(BaseModel):
     text: str
     bbox: list[float] | None = None
     column_index: int = 0
-    column_span: int = 1\n    row_span: int = 1
+    column_span: int = 1
+    row_span: int = 1
 
 
 class TableRow(BaseModel):
@@ -416,7 +417,8 @@ def extract_pdf(data: bytes) -> tuple[list[str], int, list[dict]]:
                             "text": line_text,
                             "spans": span_items,
                         })
-                    block_text = "\n".join(line_texts).strip()
+                    block_text = "
+".join(line_texts).strip()
                     if block_text:
                         blocks.append({
                             "block_index": block_index,
@@ -544,7 +546,9 @@ async def upload_document(file: Annotated[UploadFile, File(description="A PDF do
     if not data.startswith(b"%PDF-"):
         raise HTTPException(status_code=415, detail="The file does not have a valid PDF signature.")
     page_texts, page_count, page_layouts = extract_pdf(data)
-    extracted_text = "\n\n".join(page_texts).strip()
+    extracted_text = "
+
+".join(page_texts).strip()
     document_id = str(uuid.uuid4())
     with closing(connect_db()) as connection:
         connection.execute(
@@ -680,7 +684,8 @@ def get_document_tables(document_id: str) -> list[DocumentPageTablesResponse]:
                 for column_index, cell in enumerate(row.get("cells", [])):
                     cell.setdefault("bbox", None)
                     cell.setdefault("column_index", column_index)
-                    cell.setdefault("column_span", 1)\n                    cell.setdefault("row_span", 1)
+                    cell.setdefault("column_span", 1)
+                    cell.setdefault("row_span", 1)
             normalised.append(candidate)
         page_data.append({
             "document_id": row["document_id"],
@@ -938,7 +943,9 @@ def search_documents(request: SearchRequest) -> list[SearchResult]:
         ).fetchall()
     results: list[SearchResult] = []
     for page in rows:
-        paragraphs = [part.strip() for part in re.split(r"\n\s*\n", page["extracted_text"]) if part.strip()]
+        paragraphs = [part.strip() for part in re.split(r"
+\s*
+", page["extracted_text"]) if part.strip()]
         for paragraph in paragraphs:
             lowered = paragraph.lower()
             score = sum(lowered.count(term) for term in terms)
