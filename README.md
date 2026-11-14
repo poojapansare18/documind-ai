@@ -80,12 +80,18 @@ Each uploaded PDF is stored as a document record plus one text record per page. 
 
 The layout endpoint preserves text-block bounding boxes, page dimensions, block and line bounding boxes, span coordinates, font names, and font sizes from PyMuPDF. This is a geometry-preserving foundation for layout analysis, not yet automatic table reconstruction: multi-column layouts and complex tables may still require specialised detection. Scanned PDFs still require OCR.
 
+## Chunking model
+
+Text is split independently on each page into chunks of up to 1,200 characters with a 150-character overlap. The splitter prefers paragraph, sentence, and word boundaries. Each chunk stores its page number, zero-based start offset, end-exclusive offset, and text. These references allow later retrieval results to point back to their original page and exact text range. Existing documents are backfilled into the chunk table when the application starts.
+
+Chunking is a deterministic preprocessing step; it does not create embeddings or perform semantic search.
+
 ## Next milestones
 
-1. Improve table reconstruction using multi-page layouts, headers, merged cells, and confidence calibration.
-2. Infer reading order for multi-column pages.
-3. Chunk layout-aware content, generate embeddings, and add vector retrieval.
-4. Add grounded RAG answers with page citations, OCR, authentication, observability, and deployment hardening.
+1. Improve table reconstruction and infer reading order for multi-column pages.
+2. Add embedding generation and vector retrieval over persisted chunks.
+3. Add grounded RAG answers with page and chunk citations.
+4. Add OCR, authentication, observability, and deployment hardening.
 
 ## Security notes
 
