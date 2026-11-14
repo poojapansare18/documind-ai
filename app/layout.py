@@ -150,7 +150,11 @@ def detect_table_candidates(
         column_count = max(len(row["cells"]) for row in merged_rows)
         column_starts = []
         for column_index in range(column_count):
+            anchor_rows = [row for row in merged_rows if len(row["cells"]) == column_count]
             starts = [
+                row["cells"][column_index]["bbox"][0]
+                for row in anchor_rows
+            ] or [
                 row["cells"][column_index]["bbox"][0]
                 for row in merged_rows
                 if len(row["cells"]) > column_index
