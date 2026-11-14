@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 app = FastAPI(
     title="DocuMind API",
     description="A lightweight document intelligence API for PDF extraction, search, and extractive summaries.",
-    version="0.2.0",
+    version="0.4.0",
 )
 
 MAX_FILE_BYTES = 10 * 1024 * 1024
@@ -246,7 +246,7 @@ def get_document(document_id: str) -> sqlite3.Row:
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "service": "documind-api", "version": "0.2.0"}
+    return {"status": "ok", "service": "documind-api", "version": "0.4.0"}
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -259,7 +259,7 @@ main{max-width:850px;margin:7vh auto;padding:24px}.panel{background:white;border
 h1{margin:0 0 8px;font-size:2rem}p{color:#596579;line-height:1.55}.upload{border:1px dashed #9ba8bb;border-radius:12px;padding:24px;margin:22px 0;text-align:center}
 button{background:#244bd6;color:white;border:0;border-radius:9px;padding:11px 16px;font-weight:650;cursor:pointer}button:disabled{opacity:.5;cursor:wait}
 input[type=file]{max-width:100%}.result{white-space:pre-wrap;background:#f7f8fc;padding:16px;border-radius:10px;margin-top:14px;line-height:1.6}.muted{font-size:.9rem;color:#748096}
-</style></head><body><main><section class="panel"><p class="muted">DOCUMENT INTELLIGENCE · MVP 0.2</p><h1>DocuMind</h1>
+</style></head><body><main><section class="panel"><p class="muted">DOCUMENT INTELLIGENCE · MVP 0.4</p><h1>DocuMind</h1>
 <p>Upload a text-based PDF to extract its contents, generate an extractive summary, and search within your saved documents.</p>
 <div class="upload"><input id="file" type="file" accept="application/pdf"><p><button id="upload">Upload PDF</button></p><span class="muted">PDF only · Maximum 10 MB · 100 pages</span></div>
 <div id="status" role="status" aria-live="polite" class="muted">No document uploaded yet.</div><div id="output"></div></section></main>
