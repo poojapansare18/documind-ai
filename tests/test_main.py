@@ -910,3 +910,17 @@ def test_borderless_pdf_table_uses_text_alignment_strategy():
     assert tables
     assert any(table["detection_method"] == "pymupdf_text" for table in tables)
     assert any(table["column_count"] == 3 for table in tables)
+
+
+
+def test_document_workbench_home_and_static_assets_load():
+    home = client.get("/")
+    assert home.status_code == 200
+    assert "Document workspace" in home.text
+    assert "/static/app.css" in home.text
+    assert "/static/app.js" in home.text
+    assert client.get("/static/app.css").status_code == 200
+    script = client.get("/static/app.js")
+    assert script.status_code == 200
+    assert "runAsk" in script.text
+    assert client.get("/static/main.py").status_code == 404
