@@ -417,8 +417,7 @@ def extract_pdf(data: bytes) -> tuple[list[str], int, list[dict]]:
                             "text": line_text,
                             "spans": span_items,
                         })
-                    block_text = "
-".join(line_texts).strip()
+                    block_text = "\n".join(line_texts).strip()
                     if block_text:
                         blocks.append({
                             "block_index": block_index,
@@ -546,9 +545,7 @@ async def upload_document(file: Annotated[UploadFile, File(description="A PDF do
     if not data.startswith(b"%PDF-"):
         raise HTTPException(status_code=415, detail="The file does not have a valid PDF signature.")
     page_texts, page_count, page_layouts = extract_pdf(data)
-    extracted_text = "
-
-".join(page_texts).strip()
+    extracted_text = "\n\n".join(page_texts).strip()
     document_id = str(uuid.uuid4())
     with closing(connect_db()) as connection:
         connection.execute(
