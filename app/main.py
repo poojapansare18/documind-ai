@@ -6,6 +6,10 @@ import os
 import re
 import sqlite3
 import uuid
+
+from dotenv import load_dotenv
+
+load_dotenv()
 from collections import Counter
 from contextlib import closing
 from pathlib import Path
