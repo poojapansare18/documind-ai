@@ -511,28 +511,9 @@ def health() -> dict[str, str]:
 
 @app.get("/", response_class=HTMLResponse)
 def home() -> str:
-    return """<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>DocuMind — Document Intelligence</title><style>
-*{box-sizing:border-box}body{margin:0;background:#f4f6fb;color:#172033;font:16px system-ui,sans-serif}
-main{max-width:850px;margin:7vh auto;padding:24px}.panel{background:white;border:1px solid #e2e7f0;border-radius:18px;padding:28px;box-shadow:0 12px 35px #1720330b}
-h1{margin:0 0 8px;font-size:2rem}p{color:#596579;line-height:1.55}.upload{border:1px dashed #9ba8bb;border-radius:12px;padding:24px;margin:22px 0;text-align:center}
-button{background:#244bd6;color:white;border:0;border-radius:9px;padding:11px 16px;font-weight:650;cursor:pointer}button:disabled{opacity:.5;cursor:wait}
-input[type=file]{max-width:100%}.result{white-space:pre-wrap;background:#f7f8fc;padding:16px;border-radius:10px;margin-top:14px;line-height:1.6}.muted{font-size:.9rem;color:#748096}
-</style></head><body><main><section class="panel"><p class="muted">DOCUMENT INTELLIGENCE · MVP 0.10</p><h1>DocuMind</h1>
-<p>Upload a PDF to extract its contents, including scanned pages using OCR, generate an extractive summary, and search within your saved documents. Use the API documentation to index documents, search semantically, and ask questions with source citations.</p>
-<div class="upload"><input id="file" type="file" accept="application/pdf"><p><button id="upload">Upload PDF</button></p><span class="muted">PDF only · Maximum 10 MB · 100 pages</span></div>
-<div id="status" role="status" aria-live="polite" class="muted">No document uploaded yet.</div><div id="output"></div></section></main>
-<script>
-const file=document.querySelector('#file'),button=document.querySelector('#upload'),status=document.querySelector('#status'),output=document.querySelector('#output');
-button.addEventListener('click',async()=>{if(!file.files[0]){status.textContent='Choose a PDF first.';return;}button.disabled=true;status.textContent='Processing PDF…';output.replaceChildren();
-try{const data=new FormData();data.append('file',file.files[0]);const res=await fetch('/documents/upload',{method:'POST',body:data});const doc=await res.json();if(!res.ok)throw new Error(doc.detail||'Upload failed');
-status.textContent='Uploaded '+doc.filename+' · '+doc.page_count+' pages · '+doc.character_count.toLocaleString()+' characters';
-const summary=await fetch('/documents/'+doc.document_id+'/summary');const result=await summary.json();if(!summary.ok)throw new Error(result.detail||'Summary failed');
-const box=document.createElement('div');box.className='result';box.textContent=result.summary;output.append(box);
-}catch(e){status.textContent='Error: '+e.message;}finally{button.disabled=false;}});
-</script></body></html>"""
+    from app.ui import render_home
 
+    return render_home()
 
 @app.post("/documents/upload", response_model=DocumentResponse, status_code=201)
 async def upload_document(file: Annotated[UploadFile, File(description="A PDF document; scanned pages are processed with OCR")]) -> DocumentResponse:
@@ -956,3 +937,9 @@ def search_documents(request: SearchRequest) -> list[SearchResult]:
                     )
                 )
     return sorted(results, key=lambda result: result.score, reverse=True)[: request.limit]
+
+
+
+from app.ui import router as ui_router
+
+app.include_router(ui_router)
