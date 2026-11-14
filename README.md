@@ -2,7 +2,7 @@
 
 A document-intelligence API and lightweight web interface that accepts text-based PDFs, extracts their text, creates extractive summaries, and searches uploaded documents.
 
-> **Current scope:** MVP 0.6. Summaries are extractive (selected from the source text), not LLM-generated. Uploaded document text and metadata are stored in a local SQLite database. Scanned PDFs and OCR are not supported yet.
+> **Current scope:** MVP 0.7. Summaries are extractive (selected from the source text), not LLM-generated. Uploaded document text and metadata are stored in a local SQLite database. Scanned PDFs and OCR are not supported yet.
 
 ## Features
 
@@ -18,6 +18,7 @@ A document-intelligence API and lightweight web interface that accepts text-base
 - Persisted, overlapping page-aware text chunks with exact character offsets
 - Local dense embeddings using FastEmbed and the BAAI/bge-small-en-v1.5 model
 - Explicit document indexing and semantic search with page-level provenance
+- Grounded RAG answers with source labels and page-level citations
 - Layout inspection endpoint for page-by-page text blocks
 - Document listing and deletion
 - FastAPI endpoints and interactive Swagger documentation
@@ -36,9 +37,11 @@ flowchart TD
     E --> H[Document and page retrieval]
     E --> I[Layout-aware chunking]
     I --> J[Chunk retrieval with page and character offsets]
-    E --> K[Local embedding generation]
+    J --> K[Local embedding generation]
     K --> L[SQLite vector store]
     L --> M[Cosine similarity search]
+    M --> O[Grounded answer generation]
+    O --> P[OpenAI Responses API]
     E --> N[List / delete documents]
 ```
 
@@ -58,7 +61,7 @@ Open:
 - Swagger UI: http://127.0.0.1:8000/docs
 - Health check: http://127.0.0.1:8000/health
 
-The default SQLite database is created at `data/documind.db`. Set `DOCUMIND_DB_PATH` to use another location. FastEmbed downloads its default model on the first indexing request and caches it locally. Set `DOCUMIND_EMBEDDING_MODEL` to select another supported model and `FASTEMBED_CACHE_PATH` to change the model cache directory.
+The default SQLite database is created at `data/documind.db`. Set `DOCUMIND_DB_PATH` to use another location. FastEmbed downloads its default model on the first indexing request and caches it locally. Set `DOCUMIND_EMBEDDING_MODEL` to select another supported model and `FASTEMBED_CACHE_PATH` to change the model cache directory. Copy `.env.example` to `.env` and add an OpenAI API key to enable generated answers.
 
 ## Run tests
 
@@ -80,6 +83,7 @@ python -m pytest -v
 | GET | `/documents/{document_id}/chunks` | Retrieve persisted text chunks with page and character offsets |
 | POST | `/documents/{document_id}/index` | Generate and persist local embeddings for a document's chunks |
 | POST | `/documents/semantic-search` | Search indexed chunks by semantic similarity, with page provenance |
+| POST | `/documents/ask` | Answer a question using retrieved document evidence and source labels |
 | GET | `/documents/{document_id}/summary` | Return an extractive summary |
 | DELETE | `/documents/{document_id}` | Delete a saved document |
 | POST | `/documents/search` | Search saved documents by keyword; results include page numbers |
@@ -98,11 +102,16 @@ Chunking is a deterministic preprocessing step. Semantic indexing uses FastEmbed
 
 To index a document, call `POST /documents/{document_id}/index`. Then call `POST /documents/semantic-search` with a query. Search results include the source document, page, chunk index, character offsets, and cosine-similarity score. The current vector store is SQLite JSON plus an in-process cosine scan. This is appropriate for a small portfolio MVP, not for large-scale production retrieval; a dedicated vector database can replace it later.
 
+## Grounded question answering
+
+Call `POST /documents/ask` after indexing a document. The endpoint retrieves the most similar chunks, passes only those excerpts to the OpenAI Responses API, and returns the answer with source records (`S1`, `S2`, etc.). The system instruction treats document text as untrusted data, requires citations for factual claims, and tells the model to say when the indexed evidence is insufficient. The application also rejects generated answers that contain no known source label. This is a basic citation check, not a proof that every claim is entailed by its cited passage; review the returned source excerpts.
+
+This endpoint requires `OPENAI_API_KEY`; the default model is `gpt-5.5`, configurable through `OPENAI_MODEL`. API usage may incur charges. The automated tests mock the generation provider and do not make paid API calls. See the [OpenAI Responses API documentation](https://developers.openai.com/api/docs/quickstart) for the generation interface.
+
 ## Next milestones
 
 1. Improve table reconstruction and infer reading order for multi-column pages.
-2. Add grounded RAG answers with page and chunk citations.
-3. Add OCR, authentication, observability, and deployment hardening.
+2. Add OCR, authentication, observability, and deployment hardening.
 
 ## Security notes
 

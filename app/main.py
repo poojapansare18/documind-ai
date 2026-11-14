@@ -12,17 +12,22 @@ from pathlib import Path
 from typing import Annotated
 
 import fitz
-from app.chunking import chunk_text
-from app.embeddings import MODEL_NAME, embed_passages, embed_query
-from app.layout import detect_table_candidates
+from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
+from app.chunking import chunk_text
+from app.embeddings import MODEL_NAME, embed_passages, embed_query
+from app.generation import generate_grounded_answer
+from app.layout import detect_table_candidates
+
+load_dotenv()
+
 app = FastAPI(
     title="DocuMind API",
-    description="A document intelligence API for PDF extraction, keyword search, local semantic retrieval, and extractive summaries.",
-    version="0.6.0",
+    description="A document intelligence API for PDF extraction, keyword search, local semantic retrieval, grounded question answering, and extractive summaries.",
+    version="0.7.0",
 )
 
 MAX_FILE_BYTES = 10 * 1024 * 1024
@@ -161,6 +166,30 @@ class SemanticSearchResult(BaseModel):
     score: float
     text: str
     embedding_model: str
+
+
+class AskRequest(BaseModel):
+    question: str = Field(min_length=3, max_length=1000)
+    limit: int = Field(default=5, ge=1, le=8)
+    document_id: str | None = None
+
+
+class RAGSource(BaseModel):
+    source_id: str
+    document_id: str
+    filename: str
+    page_number: int
+    chunk_index: int
+    start_char: int
+    end_char: int
+    score: float
+    text: str
+
+
+class AskResponse(BaseModel):
+    question: str
+    answer: str
+    sources: list[RAGSource]
 
 
 class SummaryResponse(BaseModel):
@@ -411,7 +440,7 @@ def get_document(document_id: str) -> sqlite3.Row:
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "service": "documind-api", "version": "0.6.0"}
+    return {"status": "ok", "service": "documind-api", "version": "0.7.0"}
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -424,8 +453,8 @@ main{max-width:850px;margin:7vh auto;padding:24px}.panel{background:white;border
 h1{margin:0 0 8px;font-size:2rem}p{color:#596579;line-height:1.55}.upload{border:1px dashed #9ba8bb;border-radius:12px;padding:24px;margin:22px 0;text-align:center}
 button{background:#244bd6;color:white;border:0;border-radius:9px;padding:11px 16px;font-weight:650;cursor:pointer}button:disabled{opacity:.5;cursor:wait}
 input[type=file]{max-width:100%}.result{white-space:pre-wrap;background:#f7f8fc;padding:16px;border-radius:10px;margin-top:14px;line-height:1.6}.muted{font-size:.9rem;color:#748096}
-</style></head><body><main><section class="panel"><p class="muted">DOCUMENT INTELLIGENCE · MVP 0.6</p><h1>DocuMind</h1>
-<p>Upload a text-based PDF to extract its contents, generate an extractive summary, and search within your saved documents. Use the API documentation to index documents for semantic search.</p>
+</style></head><body><main><section class="panel"><p class="muted">DOCUMENT INTELLIGENCE · MVP 0.7</p><h1>DocuMind</h1>
+<p>Upload a text-based PDF to extract its contents, generate an extractive summary, and search within your saved documents. Use the API documentation to index documents, search semantically, and ask questions with source citations.</p>
 <div class="upload"><input id="file" type="file" accept="application/pdf"><p><button id="upload">Upload PDF</button></p><span class="muted">PDF only · Maximum 10 MB · 100 pages</span></div>
 <div id="status" role="status" aria-live="polite" class="muted">No document uploaded yet.</div><div id="output"></div></section></main>
 <script>
@@ -700,11 +729,50 @@ def semantic_search(request: SemanticSearchRequest) -> list[SemanticSearchResult
             start_char=row["start_char"],
             end_char=row["end_char"],
             score=round(score, 6),
-            text=row["chunk_text"][:500] + ("…" if len(row["chunk_text"]) > 500 else ""),
+            text=row["chunk_text"],
             embedding_model=row["model_name"],
         ))
 
     return sorted(results, key=lambda result: result.score, reverse=True)[:request.limit]
+
+
+@app.post("/documents/ask", response_model=AskResponse)
+def ask_documents(request: AskRequest) -> AskResponse:
+    retrieved = semantic_search(SemanticSearchRequest(
+        query=request.question,
+        limit=request.limit,
+        document_id=request.document_id,
+    ))
+    if not retrieved:
+        raise HTTPException(
+            status_code=409,
+            detail="No usable indexed evidence was found for this question.",
+        )
+
+    sources = [
+        {
+            "source_id": f"S{index}",
+            "document_id": item.document_id,
+            "filename": item.filename,
+            "page_number": item.page_number,
+            "chunk_index": item.chunk_index,
+            "start_char": item.start_char,
+            "end_char": item.end_char,
+            "score": item.score,
+            "text": item.text,
+        }
+        for index, item in enumerate(retrieved, start=1)
+    ]
+    try:
+        answer = generate_grounded_answer(request.question, sources)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    return AskResponse(
+        question=request.question,
+        answer=answer,
+        sources=[RAGSource(**source) for source in sources],
+    )
 
 
 @app.get("/documents/{document_id}/summary", response_model=SummaryResponse)

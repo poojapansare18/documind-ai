@@ -7,3 +7,4 @@ venv/
 .coverage
 .DS_Store
 data/
+fastembed_cache/
