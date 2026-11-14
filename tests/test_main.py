@@ -345,7 +345,8 @@ def test_existing_page_records_are_backfilled_into_chunks():
 
 
 
-def test_semantic_search_requires_indexing():
+def test_semantic_search_requires_indexing(monkeypatch):
+    monkeypatch.setattr(main, "embed_query", lambda query: [1.0, 0.0])
     upload = client.post(
         "/documents/upload",
         files={"file": ("unindexed.pdf", make_pdf("Semantic retrieval needs stored embeddings."), "application/pdf")},
