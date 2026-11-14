@@ -54,7 +54,8 @@ def _table_to_payload(table, strategy: str) -> dict | None:
         return None
 
     row_boxes: list[list[list[float] | None]] = []
-    all_x_edges: list[float] = []\n    all_y_edges: list[float] = []
+    all_x_edges: list[float] = []
+    all_y_edges: list[float] = []
     for row_index, values in enumerate(extracted_rows):
         row_object = row_objects[row_index] if row_index < len(row_objects) else None
         cell_rectangles = getattr(row_object, "cells", None) if row_object is not None else None
@@ -66,9 +67,11 @@ def _table_to_payload(table, strategy: str) -> dict | None:
         row_boxes.append(boxes)
         for bbox in boxes:
             if bbox:
-                all_x_edges.extend([bbox[0], bbox[2]])\n                all_y_edges.extend([bbox[1], bbox[3]])
+                all_x_edges.extend([bbox[0], bbox[2]])
+                all_y_edges.extend([bbox[1], bbox[3]])
 
-    x_edges = _cluster_edges(all_x_edges)\n    y_edges = _cluster_edges(all_y_edges)
+    x_edges = _cluster_edges(all_x_edges)
+    y_edges = _cluster_edges(all_y_edges)
     rows = []
     for row_index, values in enumerate(extracted_rows):
         cells = []
