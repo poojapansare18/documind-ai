@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Annotated
 
 import fitz
+from app.chunking import chunk_text
 from app.layout import detect_table_candidates
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse
@@ -19,11 +20,13 @@ from pydantic import BaseModel, Field
 app = FastAPI(
     title="DocuMind API",
     description="A lightweight document intelligence API for PDF extraction, search, and extractive summaries.",
-    version="0.4.0",
+    version="0.5.0",
 )
 
 MAX_FILE_BYTES = 10 * 1024 * 1024
 MAX_PDF_PAGES = 100
+CHUNK_MAX_CHARS = 1200
+CHUNK_OVERLAP = 150
 DB_PATH = Path(os.getenv("DOCUMIND_DB_PATH", "data/documind.db"))
 
 
@@ -122,6 +125,17 @@ class DocumentPageLayoutResponse(BaseModel):
     blocks: list[LayoutBlock]
 
 
+class DocumentChunkResponse(BaseModel):
+    document_id: str
+    filename: str
+    page_number: int
+    chunk_index: int
+    start_char: int
+    end_char: int
+    character_count: int
+    text: str
+
+
 class SummaryResponse(BaseModel):
     document_id: str
     filename: str
@@ -170,6 +184,24 @@ def init_db() -> None:
             )
             """
         )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS document_chunks (
+                chunk_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                document_id TEXT NOT NULL REFERENCES documents(document_id) ON DELETE CASCADE,
+                page_number INTEGER NOT NULL,
+                chunk_index INTEGER NOT NULL,
+                start_char INTEGER NOT NULL,
+                end_char INTEGER NOT NULL,
+                chunk_text TEXT NOT NULL,
+                UNIQUE(document_id, page_number, chunk_index)
+            )
+            """
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_document_chunks_document_page "
+            "ON document_chunks(document_id, page_number, chunk_index)"
+        )
         page_columns = {row["name"] for row in connection.execute("PRAGMA table_info(document_pages)").fetchall()}
         if "layout_json" not in page_columns:
             connection.execute("ALTER TABLE document_pages ADD COLUMN layout_json TEXT NOT NULL DEFAULT '{}'")
@@ -185,6 +217,24 @@ def init_db() -> None:
             )
             """
         )
+        # Backfill chunks for documents uploaded by earlier application versions.
+        existing_pages = connection.execute(
+            "SELECT p.document_id, p.page_number, p.extracted_text "
+            "FROM document_pages p WHERE NOT EXISTS ("
+            "SELECT 1 FROM document_chunks c WHERE c.document_id = p.document_id "
+            "AND c.page_number = p.page_number)"
+        ).fetchall()
+        for page in existing_pages:
+            connection.executemany(
+                "INSERT OR IGNORE INTO document_chunks "
+                "(document_id, page_number, chunk_index, start_char, end_char, chunk_text) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                [
+                    (page["document_id"], page["page_number"], item["chunk_index"],
+                     item["start_char"], item["end_char"], item["text"])
+                    for item in chunk_text(page["extracted_text"], CHUNK_MAX_CHARS, CHUNK_OVERLAP)
+                ],
+            )
         connection.commit()
 
 
@@ -318,7 +368,7 @@ def get_document(document_id: str) -> sqlite3.Row:
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "service": "documind-api", "version": "0.4.0"}
+    return {"status": "ok", "service": "documind-api", "version": "0.5.0"}
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -372,6 +422,17 @@ async def upload_document(file: Annotated[UploadFile, File(description="A text-b
                 for index, page_text in enumerate(page_texts, start=1)
             ],
         )
+        for page_number, page_text in enumerate(page_texts, start=1):
+            connection.executemany(
+                "INSERT INTO document_chunks "
+                "(document_id, page_number, chunk_index, start_char, end_char, chunk_text) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                [
+                    (document_id, page_number, item["chunk_index"], item["start_char"],
+                     item["end_char"], item["text"])
+                    for item in chunk_text(page_text, CHUNK_MAX_CHARS, CHUNK_OVERLAP)
+                ],
+            )
         connection.commit()
     return DocumentResponse(
         document_id=document_id,
@@ -464,6 +525,32 @@ def get_document_tables(document_id: str) -> list[DocumentPageTablesResponse]:
             tables=[TableCandidate(**candidate) for candidate in candidates],
         ))
     return pages
+
+
+@app.get("/documents/{document_id}/chunks", response_model=list[DocumentChunkResponse])
+def get_document_chunks(document_id: str) -> list[DocumentChunkResponse]:
+    get_document(document_id)
+    with closing(connect_db()) as connection:
+        rows = connection.execute(
+            "SELECT c.document_id, d.filename, c.page_number, c.chunk_index, "
+            "c.start_char, c.end_char, c.chunk_text "
+            "FROM document_chunks c JOIN documents d ON d.document_id = c.document_id "
+            "WHERE c.document_id = ? ORDER BY c.page_number, c.chunk_index",
+            (document_id,),
+        ).fetchall()
+    return [
+        DocumentChunkResponse(
+            document_id=row["document_id"],
+            filename=row["filename"],
+            page_number=row["page_number"],
+            chunk_index=row["chunk_index"],
+            start_char=row["start_char"],
+            end_char=row["end_char"],
+            character_count=len(row["chunk_text"]),
+            text=row["chunk_text"],
+        )
+        for row in rows
+    ]
 
 
 @app.get("/documents/{document_id}/summary", response_model=SummaryResponse)
