@@ -104,7 +104,10 @@ def extract_native_tables(page) -> list[dict]:
         except Exception:
             continue
         for table in getattr(finder, "tables", []):
-            payload = _table_to_payload(table, strategy)
+            try:
+                payload = _table_to_payload(table, strategy)
+            except Exception:
+                continue
             if not payload or payload["row_count"] < 2:
                 continue
             bbox = payload["bbox"]
