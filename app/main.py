@@ -112,6 +112,8 @@ class LayoutBlock(BaseModel):
 class TableCell(BaseModel):
     text: str
     bbox: list[float]
+    column_index: int = 0
+    column_span: int = 1
 
 
 class TableRow(BaseModel):
@@ -121,6 +123,8 @@ class TableRow(BaseModel):
 class TableCandidate(BaseModel):
     row_count: int
     column_count: int
+    column_starts: list[float] = []
+    header_row_index: int | None = None
     confidence: float
     rows: list[TableRow]
 
