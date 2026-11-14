@@ -342,3 +342,104 @@ def test_existing_page_records_are_backfilled_into_chunks():
     assert response.status_code == 200
     assert response.json()
     assert response.json()[0]["text"] in legacy_text
+
+
+
+def test_semantic_search_requires_indexing(monkeypatch):
+    monkeypatch.setattr(main, "embed_query", lambda query: [1.0, 0.0])
+    upload = client.post(
+        "/documents/upload",
+        files={"file": ("unindexed.pdf", make_pdf("Semantic retrieval needs stored embeddings."), "application/pdf")},
+    )
+    document_id = upload.json()["document_id"]
+    response = client.post(
+        "/documents/semantic-search",
+        json={"query": "find stored embeddings", "document_id": document_id},
+    )
+    assert response.status_code == 409
+    assert "index" in response.json()["detail"].lower()
+
+
+def test_index_and_semantic_search_return_source_provenance(monkeypatch):
+    invoice = client.post(
+        "/documents/upload",
+        files={"file": ("invoice.pdf", make_pdf("Invoice automation extracts supplier names and totals."), "application/pdf")},
+    )
+    garden = client.post(
+        "/documents/upload",
+        files={"file": ("garden.pdf", make_pdf("Gardening requires soil, sunlight, and regular watering."), "application/pdf")},
+    )
+    invoice_id = invoice.json()["document_id"]
+    garden_id = garden.json()["document_id"]
+
+    def fake_passage_embeddings(texts):
+        return [[1.0, 0.0] if "invoice" in text.lower() else [0.0, 1.0] for text in texts]
+
+    monkeypatch.setattr(main, "embed_passages", fake_passage_embeddings)
+    monkeypatch.setattr(main, "embed_query", lambda query: [1.0, 0.0])
+
+    invoice_index = client.post(f"/documents/{invoice_id}/index")
+    garden_index = client.post(f"/documents/{garden_id}/index")
+    assert invoice_index.status_code == 200
+    assert garden_index.status_code == 200
+    assert invoice_index.json()["indexed_chunks"] == 1
+    assert invoice_index.json()["dimensions"] == 2
+
+    response = client.post(
+        "/documents/semantic-search",
+        json={"query": "find invoice processing details", "limit": 5},
+    )
+    assert response.status_code == 200
+    assert response.json()
+    assert response.json()[0]["document_id"] == invoice_id
+    assert response.json()[0]["filename"] == "invoice.pdf"
+    assert response.json()[0]["page_number"] == 1
+    assert response.json()[0]["score"] == 1.0
+    assert response.json()[0]["embedding_model"] == main.MODEL_NAME
+
+
+def test_indexing_replaces_existing_vectors(monkeypatch):
+    upload = client.post(
+        "/documents/upload",
+        files={"file": ("reindex.pdf", make_pdf("Reindexing replaces old vectors safely."), "application/pdf")},
+    )
+    document_id = upload.json()["document_id"]
+    monkeypatch.setattr(main, "embed_passages", lambda texts: [[0.5, 0.5] for _ in texts])
+
+    first = client.post(f"/documents/{document_id}/index")
+    second = client.post(f"/documents/{document_id}/index")
+    assert first.status_code == 200
+    assert second.status_code == 200
+    with main.connect_db() as connection:
+        count = connection.execute(
+            "SELECT COUNT(*) FROM chunk_embeddings e "
+            "JOIN document_chunks c ON c.chunk_id = e.chunk_id "
+            "WHERE c.document_id = ?",
+            (document_id,),
+        ).fetchone()[0]
+    assert count == first.json()["indexed_chunks"]
+
+
+def test_indexing_returns_service_unavailable_when_model_fails(monkeypatch):
+    upload = client.post(
+        "/documents/upload",
+        files={"file": ("model-error.pdf", make_pdf("Embedding model failure is handled."), "application/pdf")},
+    )
+    monkeypatch.setattr(main, "embed_passages", lambda texts: (_ for _ in ()).throw(RuntimeError("model unavailable")))
+    response = client.post(f"/documents/{upload.json()['document_id']}/index")
+    assert response.status_code == 503
+
+
+def test_semantic_search_returns_404_for_unknown_document():
+    response = client.post(
+        "/documents/semantic-search",
+        json={"query": "search missing source", "document_id": "unknown-document"},
+    )
+    assert response.status_code == 404
+
+
+def test_cosine_similarity_handles_normal_and_invalid_vectors():
+    assert main.cosine_similarity([1.0, 0.0], [1.0, 0.0]) == 1.0
+    assert main.cosine_similarity([1.0, 0.0], [0.0, 1.0]) == 0.0
+    assert main.cosine_similarity([1.0], [1.0, 2.0]) == 0.0
+    assert main.cosine_similarity([0.0, 0.0], [1.0, 0.0]) == 0.0

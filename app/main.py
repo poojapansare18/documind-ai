@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 import sqlite3
@@ -12,6 +13,7 @@ from typing import Annotated
 
 import fitz
 from app.chunking import chunk_text
+from app.embeddings import MODEL_NAME, embed_passages, embed_query
 from app.layout import detect_table_candidates
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse
@@ -19,8 +21,8 @@ from pydantic import BaseModel, Field
 
 app = FastAPI(
     title="DocuMind API",
-    description="A lightweight document intelligence API for PDF extraction, search, and extractive summaries.",
-    version="0.5.0",
+    description="A document intelligence API for PDF extraction, keyword search, local semantic retrieval, and extractive summaries.",
+    version="0.6.0",
 )
 
 MAX_FILE_BYTES = 10 * 1024 * 1024
@@ -136,6 +138,31 @@ class DocumentChunkResponse(BaseModel):
     text: str
 
 
+class EmbeddingIndexResponse(BaseModel):
+    document_id: str
+    indexed_chunks: int
+    embedding_model: str
+    dimensions: int
+
+
+class SemanticSearchRequest(BaseModel):
+    query: str = Field(min_length=2, max_length=300)
+    limit: int = Field(default=5, ge=1, le=20)
+    document_id: str | None = None
+
+
+class SemanticSearchResult(BaseModel):
+    document_id: str
+    filename: str
+    page_number: int
+    chunk_index: int
+    start_char: int
+    end_char: int
+    score: float
+    text: str
+    embedding_model: str
+
+
 class SummaryResponse(BaseModel):
     document_id: str
     filename: str
@@ -201,6 +228,22 @@ def init_db() -> None:
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_document_chunks_document_page "
             "ON document_chunks(document_id, page_number, chunk_index)"
+        )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS chunk_embeddings (
+                chunk_id INTEGER PRIMARY KEY REFERENCES document_chunks(chunk_id) ON DELETE CASCADE,
+                model_name TEXT NOT NULL,
+                dimensions INTEGER NOT NULL,
+                vector_json TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_chunk_embeddings_model "
+            "ON chunk_embeddings(model_name)"
         )
         page_columns = {row["name"] for row in connection.execute("PRAGMA table_info(document_pages)").fetchall()}
         if "layout_json" not in page_columns:
@@ -368,7 +411,7 @@ def get_document(document_id: str) -> sqlite3.Row:
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "service": "documind-api", "version": "0.5.0"}
+    return {"status": "ok", "service": "documind-api", "version": "0.6.0"}
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -381,8 +424,8 @@ main{max-width:850px;margin:7vh auto;padding:24px}.panel{background:white;border
 h1{margin:0 0 8px;font-size:2rem}p{color:#596579;line-height:1.55}.upload{border:1px dashed #9ba8bb;border-radius:12px;padding:24px;margin:22px 0;text-align:center}
 button{background:#244bd6;color:white;border:0;border-radius:9px;padding:11px 16px;font-weight:650;cursor:pointer}button:disabled{opacity:.5;cursor:wait}
 input[type=file]{max-width:100%}.result{white-space:pre-wrap;background:#f7f8fc;padding:16px;border-radius:10px;margin-top:14px;line-height:1.6}.muted{font-size:.9rem;color:#748096}
-</style></head><body><main><section class="panel"><p class="muted">DOCUMENT INTELLIGENCE · MVP 0.4</p><h1>DocuMind</h1>
-<p>Upload a text-based PDF to extract its contents, generate an extractive summary, and search within your saved documents.</p>
+</style></head><body><main><section class="panel"><p class="muted">DOCUMENT INTELLIGENCE · MVP 0.6</p><h1>DocuMind</h1>
+<p>Upload a text-based PDF to extract its contents, generate an extractive summary, and search within your saved documents. Use the API documentation to index documents for semantic search.</p>
 <div class="upload"><input id="file" type="file" accept="application/pdf"><p><button id="upload">Upload PDF</button></p><span class="muted">PDF only · Maximum 10 MB · 100 pages</span></div>
 <div id="status" role="status" aria-live="polite" class="muted">No document uploaded yet.</div><div id="output"></div></section></main>
 <script>
@@ -551,6 +594,117 @@ def get_document_chunks(document_id: str) -> list[DocumentChunkResponse]:
         )
         for row in rows
     ]
+
+
+@app.post("/documents/{document_id}/index", response_model=EmbeddingIndexResponse)
+def index_document(document_id: str) -> EmbeddingIndexResponse:
+    get_document(document_id)
+    with closing(connect_db()) as connection:
+        rows = connection.execute(
+            "SELECT chunk_id, chunk_text FROM document_chunks "
+            "WHERE document_id = ? ORDER BY page_number, chunk_index",
+            (document_id,),
+        ).fetchall()
+    if not rows:
+        raise HTTPException(status_code=422, detail="This document has no text chunks to index.")
+
+    try:
+        vectors = embed_passages([row["chunk_text"] for row in rows])
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if len(vectors) != len(rows) or not vectors:
+        raise HTTPException(status_code=503, detail="The embedding provider returned an invalid number of vectors.")
+
+    dimensions = len(vectors[0])
+    if dimensions == 0 or any(
+        len(vector) != dimensions or not all(math.isfinite(value) for value in vector)
+        for vector in vectors
+    ):
+        raise HTTPException(status_code=503, detail="The embedding provider returned invalid vector data.")
+
+    with closing(connect_db()) as connection:
+        connection.executemany(
+            "DELETE FROM chunk_embeddings WHERE chunk_id = ?",
+            [(row["chunk_id"],) for row in rows],
+        )
+        connection.executemany(
+            "INSERT INTO chunk_embeddings (chunk_id, model_name, dimensions, vector_json) "
+            "VALUES (?, ?, ?, ?)",
+            [
+                (row["chunk_id"], MODEL_NAME, dimensions, json.dumps(vector))
+                for row, vector in zip(rows, vectors)
+            ],
+        )
+        connection.commit()
+
+    return EmbeddingIndexResponse(
+        document_id=document_id,
+        indexed_chunks=len(rows),
+        embedding_model=MODEL_NAME,
+        dimensions=dimensions,
+    )
+
+
+def cosine_similarity(left: list[float], right: list[float]) -> float:
+    if not left or len(left) != len(right):
+        return 0.0
+    left_norm = math.sqrt(sum(value * value for value in left))
+    right_norm = math.sqrt(sum(value * value for value in right))
+    if left_norm == 0 or right_norm == 0:
+        return 0.0
+    return sum(a * b for a, b in zip(left, right)) / (left_norm * right_norm)
+
+
+@app.post("/documents/semantic-search", response_model=list[SemanticSearchResult])
+def semantic_search(request: SemanticSearchRequest) -> list[SemanticSearchResult]:
+    if request.document_id:
+        get_document(request.document_id)
+    try:
+        query_vector = embed_query(request.query)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if not query_vector or not all(math.isfinite(value) for value in query_vector):
+        raise HTTPException(status_code=503, detail="The embedding provider returned an invalid query vector.")
+
+    sql = (
+        "SELECT c.document_id, d.filename, c.page_number, c.chunk_index, "
+        "c.start_char, c.end_char, c.chunk_text, e.model_name, e.dimensions, e.vector_json "
+        "FROM chunk_embeddings e JOIN document_chunks c ON c.chunk_id = e.chunk_id "
+        "JOIN documents d ON d.document_id = c.document_id "
+        "WHERE e.model_name = ?"
+    )
+    params: list = [MODEL_NAME]
+    if request.document_id:
+        sql += " AND c.document_id = ?"
+        params.append(request.document_id)
+
+    with closing(connect_db()) as connection:
+        rows = connection.execute(sql, params).fetchall()
+    if not rows:
+        raise HTTPException(
+            status_code=409,
+            detail="No compatible embeddings are indexed. Call POST /documents/{document_id}/index first.",
+        )
+
+    results = []
+    for row in rows:
+        if row["dimensions"] != len(query_vector):
+            continue
+        vector = json.loads(row["vector_json"])
+        score = cosine_similarity(query_vector, vector)
+        results.append(SemanticSearchResult(
+            document_id=row["document_id"],
+            filename=row["filename"],
+            page_number=row["page_number"],
+            chunk_index=row["chunk_index"],
+            start_char=row["start_char"],
+            end_char=row["end_char"],
+            score=round(score, 6),
+            text=row["chunk_text"][:500] + ("…" if len(row["chunk_text"]) > 500 else ""),
+            embedding_model=row["model_name"],
+        ))
+
+    return sorted(results, key=lambda result: result.score, reverse=True)[:request.limit]
 
 
 @app.get("/documents/{document_id}/summary", response_model=SummaryResponse)
