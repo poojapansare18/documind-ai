@@ -884,3 +884,28 @@ def test_tables_endpoint_links_likely_page_continuations():
     assert first["tables"][-1]["continues_on_next_page"] is True
     assert second["tables"][0]["continues_from_previous_page"] is True
     assert first["tables"][-1]["continuation_group"] == second["tables"][0]["continuation_group"]
+
+
+
+def test_borderless_pdf_table_uses_text_alignment_strategy():
+    doc = fitz.open()
+    page = doc.new_page(width=600, height=800)
+    rows = [
+        ["Code", "Description", "Quantity"],
+        ["A01", "AI Systems", "12"],
+        ["A02", "Data Science", "8"],
+    ]
+    x_positions = [50, 220, 430]
+    for row_index, row in enumerate(rows):
+        y = 120 + row_index * 32
+        for column_index, value in enumerate(row):
+            page.insert_text((x_positions[column_index], y), value, fontsize=10)
+    pdf_bytes = doc.tobytes()
+    doc.close()
+
+    _, page_count, layouts = main.extract_pdf(pdf_bytes)
+    assert page_count == 1
+    tables = layouts[0]["tables"]
+    assert tables
+    assert any(table["detection_method"] == "pymupdf_text" for table in tables)
+    assert any(table["column_count"] == 3 for table in tables)
