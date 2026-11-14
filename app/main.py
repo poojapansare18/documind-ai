@@ -27,7 +27,7 @@ load_dotenv()
 app = FastAPI(
     title="DocuMind API",
     description="A document intelligence API for PDF extraction, keyword search, local semantic retrieval, grounded question answering, and extractive summaries.",
-    version="0.7.0",
+    version="0.8.0",
 )
 
 MAX_FILE_BYTES = 10 * 1024 * 1024
@@ -135,6 +135,8 @@ class DocumentPageLayoutResponse(BaseModel):
     page_width: float
     page_height: float
     blocks: list[LayoutBlock]
+    extraction_method: str = "native"
+    ocr_applied: bool = False
 
 
 class DocumentChunkResponse(BaseModel):
@@ -323,7 +325,8 @@ def extract_page_text(page) -> tuple[str, object | None, str]:
     """Extract native text and fall back to OCR when a page has no usable text layer."""
     native_text = page.get_text("text").strip()
     has_images = bool(page.get_images(full=True))
-    needs_ocr = len(native_text) < OCR_MIN_NATIVE_CHARS and (not native_text or has_images)
+    has_drawings = bool(page.get_drawings())
+    needs_ocr = len(native_text) < OCR_MIN_NATIVE_CHARS and (has_images or has_drawings)
     if not needs_ocr:
         return native_text, None, "native"
 
@@ -477,7 +480,7 @@ def get_document(document_id: str) -> sqlite3.Row:
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "service": "documind-api", "version": "0.7.0"}
+    return {"status": "ok", "service": "documind-api", "version": "0.8.0"}
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -613,6 +616,8 @@ def get_document_layout(document_id: str) -> list[DocumentPageLayoutResponse]:
             page_width=layout.get("page_width", 0),
             page_height=layout.get("page_height", 0),
             blocks=[LayoutBlock(**block) for block in layout.get("blocks", [])],
+            extraction_method=layout.get("extraction_method", "native"),
+            ocr_applied=layout.get("ocr_applied", False),
         ))
     return pages
 
