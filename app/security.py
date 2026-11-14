@@ -11,6 +11,7 @@ import uuid
 from fastapi.responses import JSONResponse
 
 logger = logging.getLogger("documind.http")
+logger.setLevel(logging.INFO)
 REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 
 
@@ -26,7 +27,7 @@ async def security_middleware(request, call_next):
     protected_path = path == "/documents" or path.startswith("/documents/")
     if configured_key and protected_path:
         supplied_key = request.headers.get("X-API-Key", "")
-        if not supplied_key or not hmac.compare_digest(supplied_key, configured_key):
+        if not supplied_key or not hmac.compare_digest(supplied_key.encode("utf-8"), configured_key.encode("utf-8")):
             response = JSONResponse(
                 status_code=401,
                 content={"detail": "A valid API key is required to access document data."},
