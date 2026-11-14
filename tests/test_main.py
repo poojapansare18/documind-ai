@@ -924,3 +924,42 @@ def test_document_workbench_home_and_static_assets_load():
     assert script.status_code == 200
     assert "runAsk" in script.text
     assert client.get("/static/main.py").status_code == 404
+
+
+
+def test_auth_status_does_not_expose_or_require_api_key_by_default(monkeypatch):
+    monkeypatch.delenv("DOCUMIND_API_KEY", raising=False)
+    response = client.get("/auth/status")
+    assert response.status_code == 200
+    assert response.json() == {"api_key_required": False}
+
+
+def test_document_endpoints_require_configured_api_key(monkeypatch):
+    monkeypatch.setenv("DOCUMIND_API_KEY", "test-secret-key")
+    unauthorised = client.get("/documents")
+    assert unauthorised.status_code == 401
+    assert unauthorised.json()["detail"] == "A valid API key is required to access document data."
+
+    authorised = client.get("/documents", headers={"X-API-Key": "test-secret-key"})
+    assert authorised.status_code == 200
+    assert client.get("/health").status_code == 200
+    status = client.get("/auth/status")
+    assert status.json() == {"api_key_required": True}
+    assert "test-secret-key" not in status.text
+
+
+def test_security_headers_and_request_id_are_returned():
+    response = client.get("/health", headers={"X-Request-ID": "test-request_123"})
+    assert response.status_code == 200
+    assert response.headers["X-Request-ID"] == "test-request_123"
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["X-Frame-Options"] == "DENY"
+    assert response.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
+    assert response.headers["Permissions-Policy"] == "camera=(), microphone=(), geolocation=()"
+
+
+def test_invalid_request_id_is_replaced():
+    response = client.get("/health", headers={"X-Request-ID": "bad request id"})
+    assert response.status_code == 200
+    assert response.headers["X-Request-ID"] != "bad request id"
+    assert len(response.headers["X-Request-ID"]) == 32

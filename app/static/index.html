@@ -33,9 +33,10 @@
       <div class="sidebar-bottom">
         <div class="sidebar-note">
           <span class="note-icon">i</span>
-          <div><strong>Private by default</strong><p>Files and extracted text stay in this local application database.</p></div>
+          <div><strong>Local data storage</strong><p>Configure an API key before exposing this workspace to the public internet.</p></div>
         </div>
         <a class="sidebar-docs" href="/docs" target="_blank" rel="noreferrer">Developer documentation ↗</a>
+        <button id="lock-button" class="sidebar-docs hidden" type="button">Lock workspace</button>
         <span class="version-label">DOCUMIND · MVP 0.10</span>
       </div>
     </aside>
@@ -153,6 +154,21 @@
 
       <footer class="app-footer"><span>DocuMind · Document intelligence workspace</span><span>Extractive summaries · Local embeddings · Evidence-linked answers</span></footer>
     </main>
+  </div>
+  <div id="auth-overlay" class="auth-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+    <div class="auth-card">
+      <span class="brand-mark">D</span>
+      <div class="eyebrow">PROTECTED WORKSPACE</div>
+      <h2 id="auth-title">Unlock DocuMind</h2>
+      <p>Enter the workspace API key configured by the administrator.</p>
+      <form id="auth-form">
+        <label class="field-label" for="api-key">API key</label>
+        <input id="api-key" type="password" autocomplete="current-password" required>
+        <button class="button button-primary" type="submit">Unlock workspace</button>
+      </form>
+      <div id="auth-status" class="inline-status" role="status" aria-live="polite"></div>
+      <p class="auth-footnote">The key is kept in this browser tab's session only.</p>
+    </div>
   </div>
 </body>
 </html>
