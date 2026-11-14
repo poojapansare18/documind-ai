@@ -14,6 +14,7 @@ A document-intelligence API and lightweight web interface that accepts text-base
 - Document metadata and page retrieval endpoints
 - Page-aware keyword search results with source locations
 - PDF text-block geometry: bounding boxes, line-level coordinates, span-level coordinates, font names, and font sizes
+- Word-level coordinates and heuristic table-candidate detection
 - Layout inspection endpoint for page-by-page text blocks
 - Document listing and deletion
 - FastAPI endpoints and interactive Swagger documentation
@@ -67,6 +68,7 @@ python -m pytest -v
 | GET | `/documents/{document_id}` | Retrieve document metadata |
 | GET | `/documents/{document_id}/pages` | Retrieve extracted text by page |
 | GET | `/documents/{document_id}/layout` | Retrieve text blocks with page coordinates and font metadata |
+| GET | `/documents/{document_id}/tables` | Return heuristic table candidates by page |
 | GET | `/documents/{document_id}/summary` | Return an extractive summary |
 | DELETE | `/documents/{document_id}` | Delete a saved document |
 | POST | `/documents/search` | Search saved documents by keyword; results include page numbers |
@@ -79,10 +81,10 @@ The layout endpoint preserves text-block bounding boxes, page dimensions, block 
 
 ## Next milestones
 
-1. Infer reading order and reconstruct table rows/columns from preserved geometry.
-2. Chunk layout-aware content, generate embeddings, and add vector retrieval.
-3. Add an LLM provider adapter for grounded RAG answers with page citations.
-4. Add OCR, authentication, rate limiting, observability, and deployment hardening.
+1. Improve table reconstruction using multi-page layouts, headers, merged cells, and confidence calibration.
+2. Infer reading order for multi-column pages.
+3. Chunk layout-aware content, generate embeddings, and add vector retrieval.
+4. Add grounded RAG answers with page citations, OCR, authentication, observability, and deployment hardening.
 
 ## Security notes
 
