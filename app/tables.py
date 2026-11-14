@@ -28,6 +28,20 @@ def _nearest_edge_index(value: float, edges: list[float]) -> int:
     return min(range(len(edges)), key=lambda index: abs(edges[index] - value))
 
 
+def _overlaps_existing(bbox: list[float], existing: list[tuple[float, float, float, float]]) -> bool:
+    area = max(0.0, bbox[2] - bbox[0]) * max(0.0, bbox[3] - bbox[1])
+    if area == 0:
+        return False
+    for previous in existing:
+        intersection_width = max(0.0, min(bbox[2], previous[2]) - max(bbox[0], previous[0]))
+        intersection_height = max(0.0, min(bbox[3], previous[3]) - max(bbox[1], previous[1]))
+        intersection = intersection_width * intersection_height
+        previous_area = max(0.0, previous[2] - previous[0]) * max(0.0, previous[3] - previous[1])
+        if intersection / max(min(area, previous_area), 1.0) >= 0.85:
+            return True
+    return False
+
+
 def _table_to_payload(table, strategy: str) -> dict | None:
     extracted_rows = table.extract()
     if not extracted_rows:
@@ -40,7 +54,7 @@ def _table_to_payload(table, strategy: str) -> dict | None:
         return None
 
     row_boxes: list[list[list[float] | None]] = []
-    all_edges: list[float] = []
+    all_x_edges: list[float] = []\n    all_y_edges: list[float] = []
     for row_index, values in enumerate(extracted_rows):
         row_object = row_objects[row_index] if row_index < len(row_objects) else None
         cell_rectangles = getattr(row_object, "cells", None) if row_object is not None else None
@@ -52,9 +66,9 @@ def _table_to_payload(table, strategy: str) -> dict | None:
         row_boxes.append(boxes)
         for bbox in boxes:
             if bbox:
-                all_edges.extend([bbox[0], bbox[2]])
+                all_x_edges.extend([bbox[0], bbox[2]])\n                all_y_edges.extend([bbox[1], bbox[3]])
 
-    x_edges = _cluster_edges(all_edges)
+    x_edges = _cluster_edges(all_x_edges)\n    y_edges = _cluster_edges(all_y_edges)
     rows = []
     for row_index, values in enumerate(extracted_rows):
         cells = []
@@ -62,15 +76,21 @@ def _table_to_payload(table, strategy: str) -> dict | None:
             value = values[column_index] if column_index < len(values) else None
             bbox = row_boxes[row_index][column_index]
             column_span = 1
+            row_span = 1
             if bbox and len(x_edges) >= 2:
                 start_edge = _nearest_edge_index(bbox[0], x_edges)
                 end_edge = _nearest_edge_index(bbox[2], x_edges)
                 column_span = max(1, end_edge - start_edge)
+            if bbox and len(y_edges) >= 2:
+                top_edge = _nearest_edge_index(bbox[1], y_edges)
+                bottom_edge = _nearest_edge_index(bbox[3], y_edges)
+                row_span = max(1, bottom_edge - top_edge)
             cells.append({
                 "text": str(value).strip() if value is not None else "",
                 "bbox": bbox,
                 "column_index": column_index,
                 "column_span": column_span,
+                "row_span": row_span,
             })
         rows.append({"row_index": row_index, "cells": cells})
 
@@ -112,11 +132,7 @@ def extract_native_tables(page) -> list[dict]:
                 continue
             bbox = payload["bbox"]
             if bbox:
-                duplicate = any(
-                    all(abs(bbox[index] - previous[index]) <= 3.0 for index in range(4))
-                    for previous in seen
-                )
-                if duplicate:
+                if _overlaps_existing(bbox, seen):
                     continue
                 seen.append(tuple(bbox))
             non_empty = sum(
