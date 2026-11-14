@@ -679,9 +679,9 @@ def get_document_tables(document_id: str) -> list[DocumentPageTablesResponse]:
             candidate.setdefault("continues_from_previous_page", False)
             candidate.setdefault("continues_on_next_page", False)
             candidate.setdefault("continuation_group", None)
-            for row_index, row in enumerate(candidate.get("rows", [])):
-                row.setdefault("row_index", row_index)
-                for column_index, cell in enumerate(row.get("cells", [])):
+            for row_index, table_row in enumerate(candidate.get("rows", [])):
+                table_row.setdefault("row_index", row_index)
+                for column_index, cell in enumerate(table_row.get("cells", [])):
                     cell.setdefault("bbox", None)
                     cell.setdefault("column_index", column_index)
                     cell.setdefault("column_span", 1)
