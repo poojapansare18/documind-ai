@@ -771,8 +771,9 @@ def draw_ruled_table(page, top: float, rows: list[list[str]]) -> None:
 
 def make_two_page_continuation_pdf() -> bytes:
     doc = fitz.open()
-    first = doc.new_page(width=600, height=800)
-    second = doc.new_page(width=600, height=800)
+    doc.new_page(width=600, height=800)
+    doc.new_page(width=600, height=800)
+    first, second = doc[0], doc[1]
     draw_ruled_table(first, 650, [
         ["Item", "Description", "Qty"],
         ["A01", "First page row", "12"],
