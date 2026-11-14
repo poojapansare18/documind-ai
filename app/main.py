@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Annotated
 
 import fitz
+from app.layout import detect_table_candidates
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
@@ -89,6 +90,28 @@ class LayoutBlock(BaseModel):
     line_count: int
     font_names: list[str]
     lines: list[LayoutLine]
+
+
+class TableCell(BaseModel):
+    text: str
+    bbox: list[float]
+
+
+class TableRow(BaseModel):
+    cells: list[TableCell]
+
+
+class TableCandidate(BaseModel):
+    row_count: int
+    column_count: int
+    confidence: float
+    rows: list[TableRow]
+
+
+class DocumentPageTablesResponse(BaseModel):
+    document_id: str
+    page_number: int
+    tables: list[TableCandidate]
 
 
 class DocumentPageLayoutResponse(BaseModel):
@@ -225,10 +248,24 @@ def extract_pdf(data: bytes) -> tuple[list[str], int, list[dict]]:
                             "font_names": sorted(font_names),
                             "lines": line_items,
                         })
+                page_words = [
+                    {
+                        "x0": round(float(word[0]), 2),
+                        "y0": round(float(word[1]), 2),
+                        "x1": round(float(word[2]), 2),
+                        "y1": round(float(word[3]), 2),
+                        "text": word[4],
+                        "block_no": int(word[5]),
+                        "line_no": int(word[6]),
+                        "word_no": int(word[7]),
+                    }
+                    for word in page.get_text("words")
+                ]
                 page_layouts.append({
                     "page_width": round(float(page.rect.width), 2),
                     "page_height": round(float(page.rect.height), 2),
                     "blocks": blocks,
+                    "words": page_words,
                 })
             if not any(page_texts):
                 raise HTTPException(
@@ -404,6 +441,27 @@ def get_document_layout(document_id: str) -> list[DocumentPageLayoutResponse]:
             page_width=layout.get("page_width", 0),
             page_height=layout.get("page_height", 0),
             blocks=[LayoutBlock(**block) for block in layout.get("blocks", [])],
+        ))
+    return pages
+
+
+@app.get("/documents/{document_id}/tables", response_model=list[DocumentPageTablesResponse])
+def get_document_tables(document_id: str) -> list[DocumentPageTablesResponse]:
+    get_document(document_id)
+    with closing(connect_db()) as connection:
+        rows = connection.execute(
+            "SELECT document_id, page_number, layout_json FROM document_pages "
+            "WHERE document_id = ? ORDER BY page_number",
+            (document_id,),
+        ).fetchall()
+    pages = []
+    for row in rows:
+        layout = json.loads(row["layout_json"] or "{}")
+        candidates = detect_table_candidates(layout.get("words", []))
+        pages.append(DocumentPageTablesResponse(
+            document_id=row["document_id"],
+            page_number=row["page_number"],
+            tables=[TableCandidate(**candidate) for candidate in candidates],
         ))
     return pages
 
