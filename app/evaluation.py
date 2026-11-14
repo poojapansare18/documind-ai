@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from statistics import mean
 
 
@@ -31,7 +32,7 @@ def reciprocal_rank_at_k(ranked_items: list[str], relevant_items: set[str], k: i
 def ndcg_at_k(ranked_items: list[str], relevant_items: set[str], k: int) -> float:
     _validate_k(k)
     dcg = sum(
-        1.0 / __import__("math").log2(rank + 1)
+        1.0 / math.log2(rank + 1)
         for rank, item in enumerate(ranked_items[:k], start=1)
         if item in relevant_items
     )
@@ -53,7 +54,7 @@ def evaluate_retrieval(cases: list[dict], k: int = 5) -> dict:
 
     per_query = []
     for case in cases:
-        retrieved = [str(item) for item in case.get("retrieved", [])]
+        retrieved = list(dict.fromkeys(str(item) for item in case.get("retrieved", [])))
         relevant = {str(item) for item in case.get("relevant", [])}
         per_query.append({
             "id": case.get("id", f"query-{len(per_query) + 1}"),
