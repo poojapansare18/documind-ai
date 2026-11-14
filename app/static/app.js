@@ -1,4 +1,4 @@
-const state = { documents: [], selectedId: null, selected: null, pages: [], view: "overview" };
+const state = { documents: [], selectedId: null, askDocumentId: null, selected: null, pages: [], view: "overview" };
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 
@@ -96,6 +96,7 @@ function renderPageMetadata() {
 
 async function selectDocument(documentId) {
   state.selectedId = documentId;
+  state.askDocumentId = documentId;
   state.selected = state.documents.find(doc => doc.document_id === documentId) || null;
   renderDocuments();
   renderStats();
@@ -203,7 +204,7 @@ async function runAsk(event) {
     const result = await api("/documents/ask", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({question,limit:5,document_id:state.selectedId || null})
+      body:JSON.stringify({question,limit:5,document_id:state.askDocumentId || null})
     });
     renderAnswer(result);
     setStatus("#ask-status", "Answer generated. Review the source excerpts before relying on it.", "success");
@@ -300,6 +301,7 @@ async function deleteSelectedDocument() {
   try {
     await api(`/documents/${state.selectedId}`, {method:"DELETE"});
     state.selectedId = null;
+    state.askDocumentId = null;
     state.selected = null;
     state.pages = [];
     $("#selected-content").classList.add("hidden");
@@ -352,8 +354,7 @@ function bindEvents() {
   $("#refresh-tables").addEventListener("click", loadTables);
   $("#delete-button").addEventListener("click", deleteSelectedDocument);
   $("#clear-ask-scope").addEventListener("click", () => {
-    state.selectedId = null;
-    state.selected = null;
+    state.askDocumentId = null;
     $("#ask-scope").textContent = "All indexed documents";
     $("#ask-scope-hint").textContent = "Questions will search across every indexed document.";
   });
