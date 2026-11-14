@@ -401,7 +401,8 @@ function bindEvents() {
   $("#refresh-tables").addEventListener("click", loadTables);
   $("#delete-button").addEventListener("click", deleteSelectedDocument);
   $("#auth-form").addEventListener("submit", unlockWorkspace);
-  $("#lock-button").addEventListener("click", lockWorkspace);\n  $("#clear-ask-scope").addEventListener("click", () => {
+  $("#lock-button").addEventListener("click", lockWorkspace);
+  $("#clear-ask-scope").addEventListener("click", () => {
     state.askDocumentId = null;
     $("#ask-scope").textContent = "All indexed documents";
     $("#ask-scope-hint").textContent = "Questions will search across every indexed document.";
