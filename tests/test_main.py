@@ -443,3 +443,67 @@ def test_cosine_similarity_handles_normal_and_invalid_vectors():
     assert main.cosine_similarity([1.0, 0.0], [0.0, 1.0]) == 0.0
     assert main.cosine_similarity([1.0], [1.0, 2.0]) == 0.0
     assert main.cosine_similarity([0.0, 0.0], [1.0, 0.0]) == 0.0
+
+
+
+def test_ask_documents_returns_grounded_answer_and_source_citations(monkeypatch):
+    upload = client.post(
+        "/documents/upload",
+        files={"file": ("invoice-source.pdf", make_pdf("The invoice lists supplier names, invoice dates, and total amounts."), "application/pdf")},
+    )
+    document_id = upload.json()["document_id"]
+    monkeypatch.setattr(main, "embed_passages", lambda texts: [[1.0, 0.0] for _ in texts])
+    monkeypatch.setattr(main, "embed_query", lambda query: [1.0, 0.0])
+    monkeypatch.setattr(
+        main,
+        "generate_grounded_answer",
+        lambda question, sources: "The invoice contains supplier names, dates, and total amounts [S1].",
+    )
+
+    indexed = client.post(f"/documents/{document_id}/index")
+    assert indexed.status_code == 200
+    response = client.post(
+        "/documents/ask",
+        json={"question": "Which details does the invoice list?", "document_id": document_id},
+    )
+    assert response.status_code == 200
+    result = response.json()
+    assert "[S1]" in result["answer"]
+    assert result["sources"][0]["source_id"] == "S1"
+    assert result["sources"][0]["filename"] == "invoice-source.pdf"
+    assert result["sources"][0]["page_number"] == 1
+    assert "supplier names" in result["sources"][0]["text"]
+
+
+def test_ask_documents_requires_indexed_evidence(monkeypatch):
+    upload = client.post(
+        "/documents/upload",
+        files={"file": ("not-indexed.pdf", make_pdf("This document has not been indexed yet."), "application/pdf")},
+    )
+    monkeypatch.setattr(main, "embed_query", lambda query: [1.0, 0.0])
+    response = client.post(
+        "/documents/ask",
+        json={"question": "What does this document contain?", "document_id": upload.json()["document_id"]},
+    )
+    assert response.status_code == 409
+
+
+def test_ask_documents_handles_generation_provider_failure(monkeypatch):
+    upload = client.post(
+        "/documents/upload",
+        files={"file": ("generation-error.pdf", make_pdf("The document contains a provider failure example."), "application/pdf")},
+    )
+    document_id = upload.json()["document_id"]
+    monkeypatch.setattr(main, "embed_passages", lambda texts: [[1.0, 0.0] for _ in texts])
+    monkeypatch.setattr(main, "embed_query", lambda query: [1.0, 0.0])
+    monkeypatch.setattr(
+        main,
+        "generate_grounded_answer",
+        lambda question, sources: (_ for _ in ()).throw(RuntimeError("provider unavailable")),
+    )
+    assert client.post(f"/documents/{document_id}/index").status_code == 200
+    response = client.post(
+        "/documents/ask",
+        json={"question": "What is in this document?", "document_id": document_id},
+    )
+    assert response.status_code == 503
