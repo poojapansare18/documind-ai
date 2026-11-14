@@ -69,12 +69,26 @@ class DocumentPageResponse(BaseModel):
     text: str
 
 
+class LayoutSpan(BaseModel):
+    bbox: list[float]
+    text: str
+    font_name: str
+    font_size: float
+
+
+class LayoutLine(BaseModel):
+    bbox: list[float]
+    text: str
+    spans: list[LayoutSpan]
+
+
 class LayoutBlock(BaseModel):
     block_index: int
     bbox: list[float]
     text: str
     line_count: int
     font_names: list[str]
+    lines: list[LayoutLine]
 
 
 class DocumentPageLayoutResponse(BaseModel):
@@ -172,16 +186,36 @@ def extract_pdf(data: bytes) -> tuple[list[str], int, list[dict]]:
                 for block_index, block in enumerate(page.get_text("dict").get("blocks", [])):
                     if block.get("type") != 0:
                         continue
-                    lines = block.get("lines", [])
+                    source_lines = block.get("lines", [])
                     line_texts = []
                     font_names = set()
-                    for line in lines:
+                    line_items = []
+                    for line in source_lines:
                         spans = line.get("spans", [])
                         line_text = "".join(span.get("text", "") for span in spans).strip()
-                        if line_text:
-                            line_texts.append(line_text)
-                        font_names.update(span.get("font", "") for span in spans if span.get("font"))
-                    block_text = "\n".join(line_texts).strip()
+                        if not line_text:
+                            continue
+                        line_texts.append(line_text)
+                        span_items = []
+                        for span in spans:
+                            span_text = span.get("text", "")
+                            if not span_text:
+                                continue
+                            font_name = span.get("font", "")
+                            if font_name:
+                                font_names.add(font_name)
+                            span_items.append({
+                                "bbox": [round(float(value), 2) for value in span.get("bbox", [])],
+                                "text": span_text,
+                                "font_name": font_name,
+                                "font_size": round(float(span.get("size", 0)), 2),
+                            })
+                        line_items.append({
+                            "bbox": [round(float(value), 2) for value in line.get("bbox", [])],
+                            "text": line_text,
+                            "spans": span_items,
+                        })
+                    block_text = "\\n".join(line_texts).strip()
                     if block_text:
                         blocks.append({
                             "block_index": block_index,
@@ -189,6 +223,7 @@ def extract_pdf(data: bytes) -> tuple[list[str], int, list[dict]]:
                             "text": block_text,
                             "line_count": len(line_texts),
                             "font_names": sorted(font_names),
+                            "lines": line_items,
                         })
                 page_layouts.append({
                     "page_width": round(float(page.rect.width), 2),
