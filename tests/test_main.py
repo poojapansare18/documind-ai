@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 
 import app.main as main
 from app.chunking import chunk_text
+from app.generation import ABSTENTION, validate_answer_citations
 from app.layout import detect_table_candidates
 
 client = TestClient(main.app)
@@ -507,3 +508,11 @@ def test_ask_documents_handles_generation_provider_failure(monkeypatch):
         json={"question": "What is in this document?", "document_id": document_id},
     )
     assert response.status_code == 503
+
+
+
+def test_rag_citation_validation_rejects_missing_or_unknown_sources():
+    assert validate_answer_citations("A factual answer without citations.", 2) == ABSTENTION
+    assert validate_answer_citations("A claim with an unknown source [S3].", 2) == ABSTENTION
+    assert validate_answer_citations("A claim supported by source [S2].", 2) == "A claim supported by source [S2]."
+    assert validate_answer_citations(ABSTENTION, 0) == ABSTENTION
