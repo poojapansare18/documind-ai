@@ -10,7 +10,10 @@ A document-intelligence API and lightweight web interface that accepts text-base
 - Text extraction with PyMuPDF
 - Extractive summaries using a transparent baseline algorithm
 - Keyword-based search across saved documents
-- SQLite persistence, document listing, and deletion
+- SQLite persistence with page-level text records
+- Document metadata and page retrieval endpoints
+- Page-aware keyword search results with source locations
+- Document listing and deletion
 - FastAPI endpoints and interactive Swagger documentation
 - Automated API tests and GitHub Actions CI
 
@@ -23,8 +26,9 @@ flowchart TD
     C --> D[PyMuPDF text extraction]
     D --> E[SQLite document store]
     E --> F[Extractive summary]
-    E --> G[Keyword search]
-    E --> H[List / delete documents]
+    E --> G[Page-aware keyword search]
+    E --> H[Document and page retrieval]
+    E --> I[List / delete documents]
 ```
 
 ## Run locally
@@ -58,16 +62,24 @@ python -m pytest -v
 | GET | `/health` | Service health |
 | POST | `/documents/upload` | Validate, extract, and save a PDF |
 | GET | `/documents` | List saved documents |
+| GET | `/documents/{document_id}` | Retrieve document metadata |
+| GET | `/documents/{document_id}/pages` | Retrieve extracted text by page |
 | GET | `/documents/{document_id}/summary` | Return an extractive summary |
 | DELETE | `/documents/{document_id}` | Delete a saved document |
-| POST | `/documents/search` | Search saved documents by keyword |
+| POST | `/documents/search` | Search saved documents by keyword; results include page numbers |
 
-## Limitations and next milestones
+## Current extraction model
 
-1. Add chunking, embeddings, and vector retrieval for RAG.
-2. Add an LLM provider adapter with grounded answers and source citations.
-3. Add OCR for scanned PDFs and robust file-processing isolation.
-4. Add authentication, rate limiting, observability, and deployment hardening.
+Each uploaded PDF is stored as a document record plus one text record per page. Search results include the page number, making it possible to trace a match back to its source location. Existing documents created before page-level storage are migrated into a page-one record when the application starts.
+
+This is page-aware text extraction, not layout-aware table extraction. Multi-column layouts and complex tables may still lose their visual relationships. Scanned PDFs still require OCR.
+
+## Next milestones
+
+1. Layout-aware extraction for tables, columns, and reading order.
+2. Chunking, embeddings, and vector retrieval for semantic search.
+3. An LLM provider adapter for grounded RAG answers with page citations.
+4. OCR, authentication, rate limiting, observability, and deployment hardening.
 
 ## Security notes
 
