@@ -940,9 +940,7 @@ def search_documents(request: SearchRequest) -> list[SearchResult]:
         ).fetchall()
     results: list[SearchResult] = []
     for page in rows:
-        paragraphs = [part.strip() for part in re.split(r"
-\s*
-", page["extracted_text"]) if part.strip()]
+        paragraphs = [part.strip() for part in re.split(r"\n\s*\n", page["extracted_text"]) if part.strip()]
         for paragraph in paragraphs:
             lowered = paragraph.lower()
             score = sum(lowered.count(term) for term in terms)
