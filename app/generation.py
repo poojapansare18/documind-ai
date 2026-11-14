@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import os
+import re
 
 
 DEFAULT_MODEL = "gpt-5.5"
+ABSTENTION = "I don't have enough information in the indexed documents to answer this question."
 
 
 def generate_grounded_answer(question: str, sources: list[dict]) -> str:
@@ -31,8 +33,7 @@ def generate_grounded_answer(question: str, sources: list[dict]) -> str:
         "Answer only with information supported by the supplied excerpts. "
         "Cite every factual claim using the exact source labels, for example [S1]. "
         "Never invent facts or citations and do not use outside knowledge. "
-        "If the excerpts do not contain enough evidence, respond exactly: "
-        "'I don't have enough information in the indexed documents to answer this question.' "
+        f"If the excerpts do not contain enough evidence, respond exactly: '{ABSTENTION}' "
         "Keep the answer clear and concise."
     )
     user_input = (
@@ -55,4 +56,10 @@ def generate_grounded_answer(question: str, sources: list[dict]) -> str:
 
     if not answer:
         raise RuntimeError("The answer-generation provider returned an empty response.")
+
+    if answer != ABSTENTION:
+        allowed = {f"S{index}" for index in range(1, len(sources) + 1)}
+        cited = set(re.findall(r"\[(S\d+)\]", answer))
+        if not cited or not cited.issubset(allowed):
+            return ABSTENTION
     return answer
