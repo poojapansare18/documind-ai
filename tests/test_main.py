@@ -812,7 +812,7 @@ def test_native_table_adapter_preserves_multiline_and_estimates_merged_spans():
 
         def extract(self):
             return [
-                ["Category", "Long description\\ncontinued", None],
+                ["Category", "Long description\ncontinued", None],
                 [None, "Service", "50"],
             ]
 
@@ -820,7 +820,7 @@ def test_native_table_adapter_preserves_multiline_and_estimates_merged_spans():
 
     result = _table_to_payload(FakeTable(), "lines")
     assert result is not None
-    assert result["rows"][0]["cells"][1]["text"] == "Long description\\ncontinued"
+    assert result["rows"][0]["cells"][1]["text"] == "Long description\ncontinued"
     assert result["rows"][0]["cells"][1]["column_span"] == 2
     assert result["rows"][0]["cells"][0]["row_span"] == 2
     assert result["rows"][0]["cells"][1]["column_index"] == 1
