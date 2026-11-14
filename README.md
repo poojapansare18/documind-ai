@@ -2,7 +2,7 @@
 
 A document-intelligence API and lightweight web interface that accepts text-based PDFs, extracts their text, creates extractive summaries, and searches uploaded documents.
 
-> **Current scope:** MVP 0.6. Summaries are extractive (selected from the source text), not LLM-generated. Uploaded document text and metadata are stored in a local SQLite database. Scanned PDFs and OCR are not supported yet.
+> **Current scope:** MVP 0.7. Summaries are extractive (selected from the source text), not LLM-generated. Uploaded document text and metadata are stored in a local SQLite database. Scanned PDFs and OCR are not supported yet.
 
 ## Features
 
@@ -37,9 +37,11 @@ flowchart TD
     E --> H[Document and page retrieval]
     E --> I[Layout-aware chunking]
     I --> J[Chunk retrieval with page and character offsets]
-    E --> K[Local embedding generation]
+    J --> K[Local embedding generation]
     K --> L[SQLite vector store]
     L --> M[Cosine similarity search]
+    M --> O[Grounded answer generation]
+    O --> P[OpenAI Responses API]
     E --> N[List / delete documents]
 ```
 
@@ -98,7 +100,13 @@ Text is split independently on each page into chunks of up to 1,200 characters w
 
 Chunking is a deterministic preprocessing step. Semantic indexing uses FastEmbed's local ONNX runtime with `BAAI/bge-small-en-v1.5` (384 dimensions by default). The first indexing request downloads the model; subsequent requests reuse the local cache. No hosted embedding API key is required. See the [FastEmbed quickstart](https://qdrant.github.io/fastembed/Getting%20Started/) for model and runtime details.
 
-To index a document, call `POST /documents/{document_id}/index`. Then call `POST /documents/semantic-search` with a query. Search results include the source document, page, chunk index, character offsets, and cosine-similarity score. The current vector store is SQLite JSON plus an in-process cosine scan. This is appropriate for a small portfolio MVP, not for large-scale production retrieval; a dedicated vector database can replace it later.\n\n## Grounded question answering\n\nCall `POST /documents/ask` after indexing a document. The endpoint retrieves the most similar chunks, passes only those excerpts to the OpenAI Responses API, and returns the answer with source records (`S1`, `S2`, etc.). The system instruction treats document text as untrusted data, requires citations for factual claims, and tells the model to say when the indexed evidence is insufficient.\n\nThis endpoint requires `OPENAI_API_KEY`; the default model is `gpt-5.5`, configurable through `OPENAI_MODEL`. API usage may incur charges. The automated tests mock the generation provider and do not make paid API calls. See the [OpenAI Responses API documentation](https://developers.openai.com/api/docs/quickstart) for the generation interface.
+To index a document, call `POST /documents/{document_id}/index`. Then call `POST /documents/semantic-search` with a query. Search results include the source document, page, chunk index, character offsets, and cosine-similarity score. The current vector store is SQLite JSON plus an in-process cosine scan. This is appropriate for a small portfolio MVP, not for large-scale production retrieval; a dedicated vector database can replace it later.
+
+## Grounded question answering
+
+Call `POST /documents/ask` after indexing a document. The endpoint retrieves the most similar chunks, passes only those excerpts to the OpenAI Responses API, and returns the answer with source records (`S1`, `S2`, etc.). The system instruction treats document text as untrusted data, requires citations for factual claims, and tells the model to say when the indexed evidence is insufficient. The application also rejects generated answers that contain no known source label. This is a basic citation check, not a proof that every claim is entailed by its cited passage; review the returned source excerpts.
+
+This endpoint requires `OPENAI_API_KEY`; the default model is `gpt-5.5`, configurable through `OPENAI_MODEL`. API usage may incur charges. The automated tests mock the generation provider and do not make paid API calls. See the [OpenAI Responses API documentation](https://developers.openai.com/api/docs/quickstart) for the generation interface.
 
 ## Next milestones
 
