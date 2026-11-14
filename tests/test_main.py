@@ -319,3 +319,26 @@ def test_deleting_document_cascades_to_chunks():
             (document_id,),
         ).fetchone()[0]
     assert count == 0
+
+
+
+def test_existing_page_records_are_backfilled_into_chunks():
+    legacy_text = ("Legacy documents receive chunks during database migration. " * 30).strip()
+    with main.connect_db() as connection:
+        connection.execute(
+            "INSERT INTO documents (document_id, filename, extracted_text, page_count, character_count) "
+            "VALUES (?, ?, ?, ?, ?)",
+            ("legacy-doc", "legacy.pdf", legacy_text, 1, len(legacy_text)),
+        )
+        connection.execute(
+            "INSERT INTO document_pages (document_id, page_number, extracted_text, layout_json) "
+            "VALUES (?, ?, ?, ?)",
+            ("legacy-doc", 1, legacy_text, "{}"),
+        )
+        connection.commit()
+
+    main.init_db()
+    response = client.get("/documents/legacy-doc/chunks")
+    assert response.status_code == 200
+    assert response.json()
+    assert response.json()[0]["text"] in legacy_text
