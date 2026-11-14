@@ -749,3 +749,82 @@ def test_uploaded_two_column_pdf_exposes_layout_classification():
     assert pages.json()[0]["layout_type"] == "two_column"
     assert pages.json()[0]["column_count"] == 2
     assert pages.json()[0]["text"].index("LEFT COLUMN THIRD") < pages.json()[0]["text"].index("RIGHT COLUMN FIRST")
+
+
+
+def _table_word(text, x0, y, x1=None):
+    width = x1 if x1 is not None else x0 + max(12, len(text) * 5)
+    return {
+        "x0": x0,
+        "y0": y,
+        "x1": width,
+        "y1": y + 10,
+        "text": text,
+        "block_no": 0,
+        "line_no": 0,
+        "word_no": 0,
+    }
+
+
+def test_table_reconstruction_merges_multiline_cell_content():
+    words = [
+        _table_word("Code", 10, 10, 40),
+        _table_word("Description", 100, 10, 180),
+        _table_word("Qty", 250, 10, 270),
+        _table_word("A01", 10, 40, 35),
+        _table_word("Long description", 100, 40, 190),
+        _table_word("continued text", 100, 52, 180),
+        _table_word("12", 250, 40, 265),
+        _table_word("A02", 10, 70, 35),
+        _table_word("Another item", 100, 70, 180),
+        _table_word("8", 250, 70, 258),
+    ]
+    candidates = detect_table_candidates(words)
+    assert len(candidates) == 1
+    table = candidates[0]
+    assert table["header_row_index"] == 0
+    assert table["rows"][1]["cells"][1]["text"] == "Long description\ncontinued text"
+    assert table["rows"][1]["cells"][1]["bbox"][3] == 62
+
+
+def test_table_reconstruction_identifies_merged_cell_column_span():
+    words = [
+        _table_word("Code", 10, 10, 40),
+        _table_word("Category", 100, 10, 170),
+        _table_word("Detail", 220, 10, 270),
+        _table_word("Qty", 360, 10, 390),
+        _table_word("A01", 10, 30, 35),
+        _table_word("Combined cell", 100, 30, 310),
+        _table_word("5", 360, 30, 370),
+        _table_word("A02", 10, 50, 35),
+        _table_word("Category B", 100, 50, 175),
+        _table_word("Detail B", 220, 50, 280),
+        _table_word("8", 360, 50, 370),
+        _table_word("A03", 10, 70, 35),
+        _table_word("Category C", 100, 70, 175),
+        _table_word("Detail C", 220, 70, 280),
+        _table_word("9", 360, 70, 370),
+    ]
+    candidates = detect_table_candidates(words)
+    assert len(candidates) == 1
+    table = candidates[0]
+    assert table["column_count"] == 4
+    merged_cell = table["rows"][1]["cells"][1]
+    assert merged_cell["column_index"] == 1
+    assert merged_cell["column_span"] == 2
+    assert table["header_row_index"] == 0
+    assert table["column_starts"] == [10.0, 100.0, 220.0, 360.0]
+
+
+def test_table_candidates_do_not_invent_a_header_without_evidence():
+    words = [
+        _table_word("A01", 10, 10, 35),
+        _table_word("12", 100, 10, 125),
+        _table_word("8", 220, 10, 230),
+        _table_word("A02", 10, 30, 35),
+        _table_word("14", 100, 30, 130),
+        _table_word("6", 220, 30, 230),
+    ]
+    candidates = detect_table_candidates(words)
+    assert len(candidates) == 1
+    assert candidates[0]["header_row_index"] is None
