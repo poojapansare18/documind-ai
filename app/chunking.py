@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 
 
 def _choose_boundary(text: str, start: int, limit: int) -> int:
