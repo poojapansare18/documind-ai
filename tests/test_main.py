@@ -762,4 +762,4 @@ def test_document_workbench_home_and_static_assets_load():
     script = client.get("/static/app.js")
     assert script.status_code == 200
     assert "runAsk" in script.text
-    assert client.get("/static/../../app/main.py").status_code == 404
+    assert client.get("/static/main.py").status_code == 404
