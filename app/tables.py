@@ -101,7 +101,7 @@ def extract_native_tables(page) -> list[dict]:
     for strategy in ("lines", "text"):
         try:
             finder = page.find_tables(strategy=strategy)
-        except (AttributeError, RuntimeError, ValueError):
+        except Exception:
             continue
         for table in getattr(finder, "tables", []):
             payload = _table_to_payload(table, strategy)
@@ -110,9 +110,8 @@ def extract_native_tables(page) -> list[dict]:
             bbox = payload["bbox"]
             if bbox:
                 duplicate = any(
-                    abs(bbox[index] - previous[index]) <= 3.0
+                    all(abs(bbox[index] - previous[index]) <= 3.0 for index in range(4))
                     for previous in seen
-                    for index in range(4)
                 )
                 if duplicate:
                     continue
