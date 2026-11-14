@@ -86,10 +86,14 @@ def detect_table_candidates(
     for row in candidate_rows[1:]:
         previous = current[-1]
         vertical_gap = row["y"] - previous["y"]
-        shared_columns = min(len(row["cells"]), len(previous["cells"]))
+        row_starts = [cell["bbox"][0] for cell in row["cells"]]
+        previous_starts = [cell["bbox"][0] for cell in previous["cells"]]
         differences = [
-            abs(row["cells"][index]["bbox"][0] - previous["cells"][index]["bbox"][0])
-            for index in range(shared_columns)
+            min(abs(start - other) for other in previous_starts)
+            for start in row_starts
+        ] + [
+            min(abs(start - other) for other in row_starts)
+            for start in previous_starts
         ]
         alignment = sum(differences) / len(differences) if differences else float("inf")
         if vertical_gap <= maximum_row_gap and alignment <= column_alignment_tolerance:
@@ -193,12 +197,16 @@ def detect_table_candidates(
 
         row_alignments = []
         for previous, current_row in zip(group, group[1:]):
-            shared = min(len(previous["cells"]), len(current_row["cells"]))
-            if shared:
-                deltas = [
-                    abs(previous["cells"][index]["bbox"][0] - current_row["cells"][index]["bbox"][0])
-                    for index in range(shared)
-                ]
+            previous_starts = [cell["bbox"][0] for cell in previous["cells"]]
+            current_starts = [cell["bbox"][0] for cell in current_row["cells"]]
+            deltas = [
+                min(abs(start - other) for other in current_starts)
+                for start in previous_starts
+            ] + [
+                min(abs(start - other) for other in previous_starts)
+                for start in current_starts
+            ]
+            if deltas:
                 row_alignments.append(sum(deltas) / len(deltas))
         mean_alignment = sum(row_alignments) / len(row_alignments) if row_alignments else column_alignment_tolerance
         alignment_score = max(0.0, 1.0 - mean_alignment / column_alignment_tolerance)
