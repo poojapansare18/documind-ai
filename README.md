@@ -2,7 +2,7 @@
 
 A document-intelligence API and lightweight web interface that accepts text-based PDFs, extracts their text, creates extractive summaries, and searches uploaded documents.
 
-> **Current scope:** MVP 0.4. Summaries are extractive (selected from the source text), not LLM-generated. Uploaded document text and metadata are stored in a local SQLite database. Scanned PDFs and OCR are not supported yet.
+> **Current scope:** MVP 0.5. Summaries are extractive (selected from the source text), not LLM-generated. Uploaded document text and metadata are stored in a local SQLite database. Scanned PDFs and OCR are not supported yet.
 
 ## Features
 
@@ -15,6 +15,7 @@ A document-intelligence API and lightweight web interface that accepts text-base
 - Page-aware keyword search results with source locations
 - PDF text-block geometry: bounding boxes, line-level coordinates, span-level coordinates, font names, and font sizes
 - Word-level coordinates and heuristic table-candidate detection
+- Persisted, overlapping page-aware text chunks with exact character offsets
 - Layout inspection endpoint for page-by-page text blocks
 - Document listing and deletion
 - FastAPI endpoints and interactive Swagger documentation
@@ -31,7 +32,9 @@ flowchart TD
     E --> F[Extractive summary]
     E --> G[Page-aware keyword search]
     E --> H[Document and page retrieval]
-    E --> I[List / delete documents]
+    E --> I[Layout-aware chunking]
+    I --> J[Chunk retrieval with page and character offsets]
+    E --> K[List / delete documents]
 ```
 
 ## Run locally
@@ -69,6 +72,7 @@ python -m pytest -v
 | GET | `/documents/{document_id}/pages` | Retrieve extracted text by page |
 | GET | `/documents/{document_id}/layout` | Retrieve text blocks with page coordinates and font metadata |
 | GET | `/documents/{document_id}/tables` | Return heuristic table candidates by page |
+| GET | `/documents/{document_id}/chunks` | Retrieve persisted text chunks with page and character offsets |
 | GET | `/documents/{document_id}/summary` | Return an extractive summary |
 | DELETE | `/documents/{document_id}` | Delete a saved document |
 | POST | `/documents/search` | Search saved documents by keyword; results include page numbers |
@@ -79,12 +83,18 @@ Each uploaded PDF is stored as a document record plus one text record per page. 
 
 The layout endpoint preserves text-block bounding boxes, page dimensions, block and line bounding boxes, span coordinates, font names, and font sizes from PyMuPDF. This is a geometry-preserving foundation for layout analysis, not yet automatic table reconstruction: multi-column layouts and complex tables may still require specialised detection. Scanned PDFs still require OCR.
 
+## Chunking model
+
+Text is split independently on each page into chunks of up to 1,200 characters with a 150-character overlap. The splitter prefers paragraph, sentence, and word boundaries. Each chunk stores its page number, zero-based start offset, end-exclusive offset, and text. These references allow later retrieval results to point back to their original page and exact text range. Existing documents are backfilled into the chunk table when the application starts.
+
+Chunking is a deterministic preprocessing step; it does not create embeddings or perform semantic search.
+
 ## Next milestones
 
-1. Improve table reconstruction using multi-page layouts, headers, merged cells, and confidence calibration.
-2. Infer reading order for multi-column pages.
-3. Chunk layout-aware content, generate embeddings, and add vector retrieval.
-4. Add grounded RAG answers with page citations, OCR, authentication, observability, and deployment hardening.
+1. Improve table reconstruction and infer reading order for multi-column pages.
+2. Add embedding generation and vector retrieval over persisted chunks.
+3. Add grounded RAG answers with page and chunk citations.
+4. Add OCR, authentication, observability, and deployment hardening.
 
 ## Security notes
 
