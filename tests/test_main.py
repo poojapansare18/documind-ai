@@ -637,3 +637,31 @@ def test_extract_page_text_does_not_ocr_a_blank_page():
     assert text == ""
     assert text_page is None
     assert method == "native"
+
+
+
+def test_scanned_pdf_is_ocr_processed_end_to_end():
+    import shutil
+    import pytest
+
+    if shutil.which("tesseract") is None:
+        pytest.skip("Tesseract is not installed in this environment.")
+
+    source = fitz.open()
+    source_page = source.new_page()
+    source_page.insert_text((72, 90), "SCANNED INVOICE NUMBER 12345")
+    pixmap = source_page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
+
+    scanned = fitz.open()
+    scanned_page = scanned.new_page(width=source_page.rect.width, height=source_page.rect.height)
+    scanned_page.insert_image(scanned_page.rect, stream=pixmap.tobytes("png"))
+    pdf_bytes = scanned.tobytes()
+    source.close()
+    scanned.close()
+
+    page_texts, page_count, layouts = main.extract_pdf(pdf_bytes)
+    assert page_count == 1
+    assert "SCANNED" in page_texts[0].upper()
+    assert "12345" in page_texts[0]
+    assert layouts[0]["extraction_method"] == "ocr"
+    assert layouts[0]["ocr_applied"] is True
