@@ -2,7 +2,7 @@
 
 A document-intelligence API and lightweight web interface that accepts text-based and scanned PDFs, extracts their text, creates extractive summaries, and searches uploaded documents.
 
-> **Current scope:** MVP 0.9. Summaries are extractive (selected from the source text), not LLM-generated. Uploaded document text and metadata are stored in a local SQLite database. Scanned PDFs are processed with optional page-level OCR. Tesseract and its language data must be installed.
+> **Current scope:** MVP 0.10. Summaries are extractive (selected from the source text), not LLM-generated. Uploaded document text and metadata are stored in a local SQLite database. Scanned PDFs are processed with optional page-level OCR. Tesseract and its language data must be installed.
 
 ## Features
 
@@ -16,7 +16,9 @@ A document-intelligence API and lightweight web interface that accepts text-base
 - Document metadata and page retrieval endpoints
 - Page-aware keyword search results with source locations
 - PDF text-block geometry: bounding boxes, line-level coordinates, span-level coordinates, font names, and font sizes
-- Word-level coordinates and heuristic table-candidate detection
+- Word-level coordinates, native PyMuPDF table extraction, and geometry-based heuristic fallback
+- Table cell coordinates, column indexes, estimated merged-cell spans, and header metadata
+- Cross-page table continuation links when adjacent page geometry and column counts match
 - Persisted, overlapping page-aware text chunks with exact character offsets
 - Local dense embeddings using FastEmbed and the BAAI/bge-small-en-v1.5 model
 - Explicit document indexing and semantic search with page-level provenance
@@ -87,7 +89,7 @@ python -m pytest -v
 | GET | `/documents/{document_id}` | Retrieve document metadata |
 | GET | `/documents/{document_id}/pages` | Retrieve extracted text by page, including extraction method, OCR status, and layout classification |
 | GET | `/documents/{document_id}/layout` | Retrieve text blocks, page coordinates, font metadata, and layout classification |
-| GET | `/documents/{document_id}/tables` | Return heuristic table candidates by page |
+| GET | `/documents/{document_id}/tables` | Return structured table candidates, cell geometry, and likely cross-page continuations |
 | GET | `/documents/{document_id}/chunks` | Retrieve persisted text chunks with page and character offsets |
 | POST | `/documents/{document_id}/index` | Generate and persist local embeddings for a document's chunks |
 | POST | `/documents/semantic-search` | Search indexed chunks by semantic similarity, with page provenance |
@@ -101,6 +103,12 @@ python -m pytest -v
 Each uploaded PDF is stored as a document record plus one text record per page. Search results include the page number, making it possible to trace a match back to its source location. Existing documents created before page-level storage are migrated into a page-one record when the application starts.
 
 The layout endpoint preserves text-block bounding boxes, page dimensions, block and line bounding boxes, span coordinates, font names, and font sizes from PyMuPDF. Page and layout retrieval report whether native extraction or OCR was used and classify the page as single-column or two-column. When two columns are detected, extracted text is reordered top-to-bottom within the left column, then top-to-bottom within the right column. Full-width lines are treated as separators between vertical reading bands. This remains a geometry heuristic: pages with sidebars, uneven columns, complex tables, or unusual magazine layouts may be classified incorrectly.
+
+## Table extraction model
+
+Table extraction first uses PyMuPDF's native `Page.find_tables()` implementation, trying ruled-line detection and then text-alignment detection. It stores the extracted cell text, bounding boxes, row and column indexes, and available header metadata. Cell widths are compared with the table's detected x-coordinate boundaries to estimate column spans. Empty cells and merged-cell placeholders can still be ambiguous in some PDFs, so estimated spans should be treated as structural hints rather than guaranteed source semantics.
+
+When native table detection returns no result, DocuMind falls back to its earlier geometry heuristic. Tables on adjacent pages are linked as likely continuations only when the previous table reaches the lower page region, the next begins near the top, and their column counts and relative widths are similar. The endpoint links these page-level candidates; it does not yet combine them into one cross-page table object. PyMuPDF's table detection is geometry-based and may still require tuning for irregular or borderless layouts. See the [PyMuPDF table extraction documentation](https://pymupdf.readthedocs.io/en/latest/page.html#tables-and-related-classes).
 
 ## Chunking model
 

@@ -5,6 +5,7 @@ import app.main as main
 from app.chunking import chunk_text
 from app.generation import ABSTENTION, validate_answer_citations
 from app.layout import detect_table_candidates, reconstruct_reading_order
+from app.tables import _table_to_payload
 
 client = TestClient(main.app)
 
@@ -749,3 +750,163 @@ def test_uploaded_two_column_pdf_exposes_layout_classification():
     assert pages.json()[0]["layout_type"] == "two_column"
     assert pages.json()[0]["column_count"] == 2
     assert pages.json()[0]["text"].index("LEFT COLUMN THIRD") < pages.json()[0]["text"].index("RIGHT COLUMN FIRST")
+
+
+def draw_ruled_table(page, top: float, rows: list[list[str]]) -> None:
+    x_edges = [50, 210, 370, 530]
+    row_height = 34
+    bottom = top + row_height * len(rows)
+    for y in [top + index * row_height for index in range(len(rows) + 1)]:
+        page.draw_line((x_edges[0], y), (x_edges[-1], y), color=(0, 0, 0), width=0.8)
+    for x in x_edges:
+        page.draw_line((x, top), (x, bottom), color=(0, 0, 0), width=0.8)
+    for row_index, values in enumerate(rows):
+        for column_index, value in enumerate(values):
+            page.insert_text(
+                (x_edges[column_index] + 6, top + row_index * row_height + 22),
+                value,
+                fontsize=10,
+            )
+
+
+def make_two_page_continuation_pdf() -> bytes:
+    doc = fitz.open()
+    doc.new_page(width=600, height=800)
+    doc.new_page(width=600, height=800)
+    first, second = doc[0], doc[1]
+    draw_ruled_table(first, 650, [
+        ["Item", "Description", "Qty"],
+        ["A01", "First page row", "12"],
+        ["A02", "Last page row", "8"],
+    ])
+    draw_ruled_table(second, 30, [
+        ["Item", "Description", "Qty"],
+        ["A03", "Continued row", "5"],
+        ["A04", "Final row", "2"],
+    ])
+    data = doc.tobytes()
+    doc.close()
+    return data
+
+
+def test_native_table_adapter_preserves_multiline_and_estimates_merged_spans():
+    class FakeRow:
+        def __init__(self, cells):
+            self.cells = cells
+
+    class FakeHeader:
+        names = ["Category", "Description", "Amount"]
+        external = False
+
+    class FakeTable:
+        col_count = 3
+        bbox = (10, 10, 150, 70)
+        header = FakeHeader()
+        cells = [
+            (10, 10, 50, 70), (50, 10, 150, 40), None,
+            None, (50, 40, 100, 70), (100, 40, 150, 70),
+        ]
+        rows = [
+            FakeRow([(10, 10, 50, 70), (50, 10, 150, 40), None]),
+            FakeRow([None, (50, 40, 100, 70), (100, 40, 150, 70)]),
+        ]
+
+        def extract(self):
+            return [
+                ["Category", "Long description\ncontinued", None],
+                [None, "Service", "50"],
+            ]
+
+    from app.tables import _table_to_payload
+
+    result = _table_to_payload(FakeTable(), "lines")
+    assert result is not None
+    assert result["rows"][0]["cells"][1]["text"] == "Long description\ncontinued"
+    assert result["rows"][0]["cells"][1]["column_span"] == 2
+    assert result["rows"][0]["cells"][0]["row_span"] == 2
+    assert result["rows"][0]["cells"][1]["column_index"] == 1
+    assert result["header_names"] == ["Category", "Description", "Amount"]
+
+def test_ruled_pdf_table_is_extracted_with_native_geometry():
+    doc = fitz.open()
+    page = doc.new_page(width=600, height=800)
+    draw_ruled_table(page, 100, [
+        ["Item", "Description", "Qty"],
+        ["A01", "AI Systems", "12"],
+        ["A02", "Data Science", "8"],
+    ])
+    pdf_bytes = doc.tobytes()
+    doc.close()
+
+    _, page_count, layouts = main.extract_pdf(pdf_bytes)
+    assert page_count == 1
+    tables = layouts[0]["tables"]
+    assert tables
+    assert tables[0]["detection_method"] == "pymupdf_lines"
+    assert tables[0]["row_count"] >= 3
+    assert tables[0]["column_count"] == 3
+    assert tables[0]["bbox"] is not None
+    assert tables[0]["rows"][0]["cells"][0]["text"] == "Item"
+
+
+def test_table_endpoint_exposes_native_table_structure():
+    doc = fitz.open()
+    page = doc.new_page(width=600, height=800)
+    draw_ruled_table(page, 100, [
+        ["Item", "Description", "Qty"],
+        ["A01", "AI Systems", "12"],
+        ["A02", "Data Science", "8"],
+    ])
+    pdf_bytes = doc.tobytes()
+    doc.close()
+    upload = client.post(
+        "/documents/upload",
+        files={"file": ("catalog-table.pdf", pdf_bytes, "application/pdf")},
+    )
+    assert upload.status_code == 201
+    response = client.get(f"/documents/{upload.json()['document_id']}/tables")
+    assert response.status_code == 200
+    table = response.json()[0]["tables"][0]
+    assert table["detection_method"] == "pymupdf_lines"
+    assert table["rows"][1]["cells"][1]["text"] == "AI Systems"
+    assert table["rows"][1]["cells"][1]["column_index"] == 1
+
+
+def test_tables_endpoint_links_likely_page_continuations():
+    upload = client.post(
+        "/documents/upload",
+        files={"file": ("continued-table.pdf", make_two_page_continuation_pdf(), "application/pdf")},
+    )
+    assert upload.status_code == 201
+    response = client.get(f"/documents/{upload.json()['document_id']}/tables")
+    assert response.status_code == 200
+    first, second = response.json()
+    assert first["tables"] and second["tables"]
+    assert first["tables"][-1]["continues_on_next_page"] is True
+    assert second["tables"][0]["continues_from_previous_page"] is True
+    assert first["tables"][-1]["continuation_group"] == second["tables"][0]["continuation_group"]
+
+
+
+def test_borderless_pdf_table_uses_text_alignment_strategy():
+    doc = fitz.open()
+    page = doc.new_page(width=600, height=800)
+    rows = [
+        ["Code", "Description", "Quantity"],
+        ["A01", "AI Systems", "12"],
+        ["A02", "Data Science", "8"],
+    ]
+    x_positions = [50, 220, 430]
+    for row_index, row in enumerate(rows):
+        y = 120 + row_index * 32
+        for column_index, value in enumerate(row):
+            page.insert_text((x_positions[column_index], y), value, fontsize=10)
+    pdf_bytes = doc.tobytes()
+    doc.close()
+
+    _, page_count, layouts = main.extract_pdf(pdf_bytes)
+    assert page_count == 1
+    tables = layouts[0]["tables"]
+    assert tables
+    assert any(table["detection_method"] == "pymupdf_text" for table in tables)
+    assert any(table["column_count"] == 3 for table in tables)

@@ -21,13 +21,14 @@ from app.chunking import chunk_text
 from app.embeddings import MODEL_NAME, embed_passages, embed_query
 from app.generation import generate_grounded_answer
 from app.layout import detect_table_candidates, reconstruct_reading_order
+from app.tables import extract_native_tables
 
 load_dotenv()
 
 app = FastAPI(
     title="DocuMind API",
-    description="A document intelligence API for PDF extraction, OCR, layout-aware reading order, keyword search, semantic retrieval, and grounded question answering.",
-    version="0.9.0",
+    description="A document intelligence API for PDF extraction, OCR, structured table extraction, layout-aware reading order, keyword search, semantic retrieval, and grounded question answering.",
+    version="0.10.0",
 )
 
 MAX_FILE_BYTES = 10 * 1024 * 1024
@@ -111,17 +112,28 @@ class LayoutBlock(BaseModel):
 
 class TableCell(BaseModel):
     text: str
-    bbox: list[float]
+    bbox: list[float] | None = None
+    column_index: int = 0
+    column_span: int = 1
+    row_span: int = 1
 
 
 class TableRow(BaseModel):
+    row_index: int = 0
     cells: list[TableCell]
 
 
 class TableCandidate(BaseModel):
     row_count: int
     column_count: int
-    confidence: float
+    confidence: float | None = None
+    detection_method: str = "heuristic"
+    bbox: list[float] | None = None
+    header_names: list[str] = Field(default_factory=list)
+    header_external: bool = False
+    continues_from_previous_page: bool = False
+    continues_on_next_page: bool = False
+    continuation_group: str | None = None
     rows: list[TableRow]
 
 
@@ -441,6 +453,7 @@ def extract_pdf(data: bytes) -> tuple[list[str], int, list[dict]]:
                     "page_height": round(float(page.rect.height), 2),
                     "blocks": blocks,
                     "words": page_words,
+                    "tables": extract_native_tables(page) if extraction_method == "native" else [],
                     "extraction_method": extraction_method,
                     "ocr_applied": extraction_method == "ocr",
                     "layout_type": reading_order["layout_type"],
@@ -493,7 +506,7 @@ def get_document(document_id: str) -> sqlite3.Row:
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "service": "documind-api", "version": "0.9.0"}
+    return {"status": "ok", "service": "documind-api", "version": "0.10.0"}
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -506,7 +519,7 @@ main{max-width:850px;margin:7vh auto;padding:24px}.panel{background:white;border
 h1{margin:0 0 8px;font-size:2rem}p{color:#596579;line-height:1.55}.upload{border:1px dashed #9ba8bb;border-radius:12px;padding:24px;margin:22px 0;text-align:center}
 button{background:#244bd6;color:white;border:0;border-radius:9px;padding:11px 16px;font-weight:650;cursor:pointer}button:disabled{opacity:.5;cursor:wait}
 input[type=file]{max-width:100%}.result{white-space:pre-wrap;background:#f7f8fc;padding:16px;border-radius:10px;margin-top:14px;line-height:1.6}.muted{font-size:.9rem;color:#748096}
-</style></head><body><main><section class="panel"><p class="muted">DOCUMENT INTELLIGENCE · MVP 0.7</p><h1>DocuMind</h1>
+</style></head><body><main><section class="panel"><p class="muted">DOCUMENT INTELLIGENCE · MVP 0.10</p><h1>DocuMind</h1>
 <p>Upload a PDF to extract its contents, including scanned pages using OCR, generate an extractive summary, and search within your saved documents. Use the API documentation to index documents, search semantically, and ask questions with source citations.</p>
 <div class="upload"><input id="file" type="file" accept="application/pdf"><p><button id="upload">Upload PDF</button></p><span class="muted">PDF only · Maximum 10 MB · 100 pages</span></div>
 <div id="status" role="status" aria-live="polite" class="muted">No document uploaded yet.</div><div id="output"></div></section></main>
@@ -648,16 +661,74 @@ def get_document_tables(document_id: str) -> list[DocumentPageTablesResponse]:
             "WHERE document_id = ? ORDER BY page_number",
             (document_id,),
         ).fetchall()
-    pages = []
+
+    page_data = []
     for row in rows:
         layout = json.loads(row["layout_json"] or "{}")
-        candidates = detect_table_candidates(layout.get("words", []))
-        pages.append(DocumentPageTablesResponse(
-            document_id=row["document_id"],
-            page_number=row["page_number"],
-            tables=[TableCandidate(**candidate) for candidate in candidates],
-        ))
-    return pages
+        candidates = layout.get("tables") or detect_table_candidates(layout.get("words", []))
+        normalised = []
+        for candidate in candidates:
+            candidate = dict(candidate)
+            candidate.setdefault("detection_method", "heuristic")
+            candidate.setdefault("bbox", None)
+            candidate.setdefault("header_names", [])
+            candidate.setdefault("header_external", False)
+            candidate.setdefault("continues_from_previous_page", False)
+            candidate.setdefault("continues_on_next_page", False)
+            candidate.setdefault("continuation_group", None)
+            for row_index, table_row in enumerate(candidate.get("rows", [])):
+                table_row.setdefault("row_index", row_index)
+                for column_index, cell in enumerate(table_row.get("cells", [])):
+                    cell.setdefault("bbox", None)
+                    cell.setdefault("column_index", column_index)
+                    cell.setdefault("column_span", 1)
+                    cell.setdefault("row_span", 1)
+            normalised.append(candidate)
+        page_data.append({
+            "document_id": row["document_id"],
+            "page_number": row["page_number"],
+            "page_width": float(layout.get("page_width", 0)),
+            "page_height": float(layout.get("page_height", 0)),
+            "tables": normalised,
+        })
+
+    # Link likely continuations when a table reaches the bottom of one page
+    # and a structurally similar table starts near the top of the next page.
+    for previous, current in zip(page_data, page_data[1:]):
+        if not previous["tables"] or not current["tables"]:
+            continue
+        previous_index = len(previous["tables"]) - 1
+        previous_table = previous["tables"][previous_index]
+        current_table = current["tables"][0]
+        previous_bbox = previous_table.get("bbox")
+        current_bbox = current_table.get("bbox")
+        if not previous_bbox or not current_bbox:
+            continue
+        previous_height = previous["page_height"]
+        current_height = current["page_height"]
+        if not previous_height or not current_height:
+            continue
+        previous_reaches_bottom = previous_bbox[3] / previous_height >= 0.72
+        current_starts_top = current_bbox[1] / current_height <= 0.28
+        same_columns = previous_table["column_count"] == current_table["column_count"]
+        previous_width = (previous_bbox[2] - previous_bbox[0]) / max(previous["page_width"], 1)
+        current_width = (current_bbox[2] - current_bbox[0]) / max(current["page_width"], 1)
+        similar_width = abs(previous_width - current_width) <= 0.15
+        if previous_reaches_bottom and current_starts_top and same_columns and similar_width:
+            group_id = f"p{previous['page_number']}-t{previous_index + 1}"
+            previous_table["continues_on_next_page"] = True
+            previous_table["continuation_group"] = group_id
+            current_table["continues_from_previous_page"] = True
+            current_table["continuation_group"] = group_id
+
+    return [
+        DocumentPageTablesResponse(
+            document_id=page["document_id"],
+            page_number=page["page_number"],
+            tables=[TableCandidate(**candidate) for candidate in page["tables"]],
+        )
+        for page in page_data
+    ]
 
 
 @app.get("/documents/{document_id}/chunks", response_model=list[DocumentChunkResponse])
