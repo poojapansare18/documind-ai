@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f7fb">
+  <title>DocuMind — Document Intelligence</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="DocuMind home">
+      <span class="brand-mark">D</span>
+      <span>DocuMind</span>
+      <span class="brand-caption">DOCUMENT WORKSPACE</span>
+    </a>
+    <div class="topbar-actions">
+      <span class="connection-state"><span class="status-dot"></span> Local workspace</span>
+      <a class="api-link" href="/docs" target="_blank" rel="noreferrer">API reference ↗</a>
+    </div>
+  </header>
+
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-label">WORKSPACE</div>
+      <nav class="main-nav" aria-label="Main navigation">
+        <button class="nav-item active" data-view="overview"><span class="nav-icon">▦</span> Overview</button>
+        <button class="nav-item" data-view="search"><span class="nav-icon">⌕</span> Search documents</button>
+        <button class="nav-item" data-view="ask"><span class="nav-icon">✳</span> Ask documents</button>
+        <button class="nav-item" data-view="tables"><span class="nav-icon">▤</span> Extracted tables</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="sidebar-note">
+          <span class="note-icon">i</span>
+          <div><strong>Private by default</strong><p>Files and extracted text stay in this local application database.</p></div>
+        </div>
+        <a class="sidebar-docs" href="/docs" target="_blank" rel="noreferrer">Developer documentation ↗</a>
+        <span class="version-label">DOCUMIND · MVP 0.10</span>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <section class="page active" id="view-overview">
+        <div class="page-heading">
+          <div>
+            <div class="eyebrow">YOUR DOCUMENTS</div>
+            <h1>Document workspace</h1>
+            <p class="page-subtitle">Upload, organise, search and question your PDF knowledge base.</p>
+          </div>
+          <div class="heading-chip"><span class="status-dot"></span> Ready</div>
+        </div>
+
+        <section class="upload-panel">
+          <div class="upload-copy">
+            <div class="upload-icon">↑</div>
+            <div>
+              <h2>Bring a document into your workspace</h2>
+              <p>Upload a text-based or scanned PDF. DocuMind extracts the content and prepares it for search.</p>
+            </div>
+          </div>
+          <div class="upload-controls">
+            <label class="file-picker" for="pdf-file">Choose PDF</label>
+            <input id="pdf-file" type="file" accept="application/pdf,.pdf">
+            <button id="upload-button" class="button button-primary">Upload document</button>
+          </div>
+          <div class="upload-footnote">PDF only · Maximum 10 MB · Up to 100 pages · Scanned pages use OCR</div>
+          <div id="upload-status" class="inline-status" role="status" aria-live="polite"></div>
+        </section>
+
+        <section class="stat-grid" aria-label="Workspace statistics">
+          <article class="stat-card"><span class="stat-label">Documents</span><strong id="stat-documents">0</strong><span class="stat-foot">Saved in this workspace</span></article>
+          <article class="stat-card"><span class="stat-label">Total pages</span><strong id="stat-pages">0</strong><span class="stat-foot">Across all documents</span></article>
+          <article class="stat-card"><span class="stat-label">Extracted characters</span><strong id="stat-characters">0</strong><span class="stat-foot">Text available for retrieval</span></article>
+          <article class="stat-card"><span class="stat-label">Selected document</span><strong id="stat-selected">—</strong><span class="stat-foot">Current working file</span></article>
+        </section>
+
+        <div class="workspace-grid">
+          <section class="surface document-surface">
+            <div class="surface-heading">
+              <div><h2>Document library</h2><p>Your recently uploaded files</p></div>
+              <span id="document-count" class="count-pill">0 files</span>
+            </div>
+            <div id="document-list" class="document-list">
+              <div class="empty-state"><div class="empty-symbol">▤</div><strong>No documents yet</strong><p>Upload a PDF to start building your knowledge base.</p></div>
+            </div>
+          </section>
+
+          <section class="surface detail-surface">
+            <div class="surface-heading">
+              <div><h2>Document details</h2><p>Summary, extraction and indexing</p></div>
+              <span id="selected-badge" class="state-pill">No selection</span>
+            </div>
+            <div id="selected-empty" class="empty-state detail-empty"><div class="empty-symbol">↖</div><strong>Select a document</strong><p>Choose a file from your library to inspect its contents and run document actions.</p></div>
+            <div id="selected-content" class="selected-content hidden">
+              <div class="selected-file">
+                <div class="pdf-icon">PDF</div>
+                <div class="selected-file-copy"><strong id="selected-filename"></strong><span id="selected-meta"></span></div>
+              </div>
+              <div class="action-row">
+                <button id="index-button" class="button button-primary button-small">Create search index</button>
+                <button id="tables-button" class="button button-secondary button-small">View tables</button>
+                <button id="delete-button" class="button button-quiet button-small">Delete</button>
+              </div>
+              <div id="document-action-status" class="inline-status" role="status" aria-live="polite"></div>
+              <div class="detail-block"><div class="detail-label">EXTRACTIVE SUMMARY</div><p id="selected-summary" class="summary-text">Loading summary…</p></div>
+              <div class="detail-block"><div class="detail-label">PAGE EXTRACTION</div><div id="page-metadata" class="page-metadata"></div></div>
+              <div class="detail-block"><div class="detail-label">PAGE 1 TEXT PREVIEW</div><pre id="page-preview" class="page-preview"></pre></div>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section class="page" id="view-search">
+        <div class="page-heading"><div><div class="eyebrow">RETRIEVAL</div><h1>Search documents</h1><p class="page-subtitle">Find exact terms or retrieve passages by meaning.</p></div></div>
+        <section class="surface search-surface">
+          <form id="search-form" class="search-form">
+            <label class="field-label" for="search-query">What are you looking for?</label>
+            <div class="search-controls">
+              <input id="search-query" type="search" placeholder="e.g. invoice processing, supplier details…" required minlength="2">
+              <select id="search-mode" aria-label="Search type"><option value="keyword">Keyword search</option><option value="semantic">Semantic search</option></select>
+              <button class="button button-primary" type="submit">Search</button>
+            </div>
+            <p class="field-hint">Semantic search requires documents to be indexed first. Keyword search does not.</p>
+          </form>
+          <div id="search-status" class="inline-status" role="status" aria-live="polite"></div>
+          <div id="search-results" class="result-list"><div class="empty-state"><div class="empty-symbol">⌕</div><strong>Search your knowledge base</strong><p>Enter a phrase to find matching document passages.</p></div></div>
+        </section>
+      </section>
+
+      <section class="page" id="view-ask">
+        <div class="page-heading"><div><div class="eyebrow">GROUNDED QUESTION ANSWERING</div><h1>Ask your documents</h1><p class="page-subtitle">Get answers based on retrieved document evidence, with page-level source references.</p></div></div>
+        <section class="surface ask-surface">
+          <div class="ask-context"><span class="context-icon">✳</span><div><strong id="ask-scope">All indexed documents</strong><p id="ask-scope-hint">Select a document in Overview to limit the answer to one file.</p></div><button id="clear-ask-scope" class="text-button">Clear scope</button></div>
+          <form id="ask-form">
+            <label class="field-label" for="ask-question">Ask a question</label>
+            <textarea id="ask-question" rows="3" placeholder="What are the main findings in these documents?" required minlength="3"></textarea>
+            <div class="ask-submit-row"><span class="field-hint">Answers require indexed documents and an OpenAI API key.</span><button class="button button-primary" type="submit">Generate answer</button></div>
+          </form>
+          <div id="ask-status" class="inline-status" role="status" aria-live="polite"></div>
+          <div id="answer-panel" class="answer-panel"><div class="empty-state"><div class="empty-symbol">✳</div><strong>Your answer will appear here</strong><p>DocuMind will include source excerpts and page references.</p></div></div>
+        </section>
+      </section>
+
+      <section class="page" id="view-tables">
+        <div class="page-heading"><div><div class="eyebrow">STRUCTURED EXTRACTION</div><h1>Extracted tables</h1><p class="page-subtitle">Inspect table candidates detected in the selected PDF.</p></div></div>
+        <section class="surface tables-surface">
+          <div class="table-context"><span id="tables-scope">No document selected</span><button id="refresh-tables" class="button button-secondary button-small" disabled>Refresh tables</button></div>
+          <div id="tables-status" class="inline-status" role="status" aria-live="polite"></div>
+          <div id="tables-results"><div class="empty-state"><div class="empty-symbol">▤</div><strong>Select a document first</strong><p>Choose a PDF in Overview to inspect detected tables.</p></div></div>
+        </section>
+      </section>
+
+      <footer class="app-footer"><span>DocuMind · Document intelligence workspace</span><span>Extractive summaries · Local embeddings · Evidence-linked answers</span></footer>
+    </main>
+  </div>
+</body>
+</html>
