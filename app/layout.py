@@ -137,23 +137,41 @@ def reconstruct_reading_order(
 ) -> dict:
     """Reorder clear two-column pages as left column then right column.
 
-    Full-width lines split the page into vertical reading bands. Pages without
-    enough evidence for two columns retain PyMuPDF's native text order.
+    Word lines are split at unusually wide horizontal gaps so that left and
+    right column text sharing the same baseline are not mistaken for one line.
+    Full-width lines divide the page into vertical reading bands.
     """
     lines = _group_words_into_lines(words)
     records = []
+    column_gap_threshold = max(36.0, float(page_width) * 0.06)
     for line in lines:
         line_words = line["words"]
         if not line_words:
             continue
-        x0 = min(float(word.get("x0", 0)) for word in line_words)
-        x1 = max(float(word.get("x1", 0)) for word in line_words)
-        records.append({
-            "y": float(line["y"]),
-            "x0": x0,
-            "x1": x1,
-            "text": " ".join(str(word.get("text", "")) for word in line_words).strip(),
-        })
+
+        segments = [[line_words[0]]]
+        for word in line_words[1:]:
+            previous = segments[-1][-1]
+            gap = float(word.get("x0", 0)) - float(previous.get("x1", 0))
+            if gap >= column_gap_threshold:
+                segments.append([word])
+            else:
+                segments[-1].append(word)
+
+        # Three or more separated groups on one baseline are more likely to
+        # be table cells than prose columns. Keep that row together.
+        if len(segments) > 2:
+            segments = [line_words]
+
+        for segment in segments:
+            x0 = min(float(word.get("x0", 0)) for word in segment)
+            x1 = max(float(word.get("x1", 0)) for word in segment)
+            records.append({
+                "y": float(line["y"]),
+                "x0": x0,
+                "x1": x1,
+                "text": " ".join(str(word.get("text", "")) for word in segment).strip(),
+            })
 
     midpoint = float(page_width) / 2.0
     left_lines = []
@@ -197,4 +215,3 @@ def reconstruct_reading_order(
         "layout_type": "two_column",
         "column_count": 2,
     }
-
