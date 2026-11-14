@@ -23,7 +23,7 @@ A document-intelligence API and lightweight web interface that accepts text-base
 - Layout inspection endpoint for page-by-page text blocks
 - Document listing and deletion
 - FastAPI endpoints and interactive Swagger documentation
-- Automated API tests and GitHub Actions CI
+- Automated API tests, including a real scanned-PDF OCR integration test, and GitHub Actions CI
 
 ## Architecture
 
