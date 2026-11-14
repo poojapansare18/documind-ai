@@ -26,7 +26,7 @@ load_dotenv()
 
 app = FastAPI(
     title="DocuMind API",
-    description="A document intelligence API for PDF extraction, keyword search, local semantic retrieval, grounded question answering, and extractive summaries.",
+    description="A document intelligence API for PDF extraction, OCR, layout-aware reading order, keyword search, semantic retrieval, and grounded question answering.",
     version="0.9.0",
 )
 
