@@ -217,7 +217,7 @@ def test_table_candidate_detection_uses_repeated_aligned_rows():
         for word_no, (text, x0, x1) in enumerate(cells):
             words.append({
                 "x0": x0, "y0": y, "x1": x1, "y1": y + 10,
-                "text": text, "block_no": 0, "line_no": line_no, "word_no": word_no,
+                "text": text, "block_no": word_no, "line_no": 0, "word_no": word_no,
             })
     candidates = detect_table_candidates(words)
     assert len(candidates) == 1
