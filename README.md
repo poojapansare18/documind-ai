@@ -51,6 +51,10 @@ flowchart TD
     E --> N[List / delete documents]
 ```
 
+## Web workbench
+
+The root route (/) serves a responsive document workspace for uploading PDFs, browsing saved files, reviewing extractive summaries and page extraction metadata, indexing documents, running keyword or semantic search, asking evidence-grounded questions, and inspecting extracted table candidates. The UI uses the same FastAPI endpoints documented below; the interactive API reference remains available at /docs.
+
 ## Run locally
 
 Requires Python 3.10 or newer.
