@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import re
 import sqlite3
@@ -17,7 +18,7 @@ from pydantic import BaseModel, Field
 app = FastAPI(
     title="DocuMind API",
     description="A lightweight document intelligence API for PDF extraction, search, and extractive summaries.",
-    version="0.2.0",
+    version="0.4.0",
 )
 
 MAX_FILE_BYTES = 10 * 1024 * 1024
@@ -68,6 +69,36 @@ class DocumentPageResponse(BaseModel):
     text: str
 
 
+class LayoutSpan(BaseModel):
+    bbox: list[float]
+    text: str
+    font_name: str
+    font_size: float
+
+
+class LayoutLine(BaseModel):
+    bbox: list[float]
+    text: str
+    spans: list[LayoutSpan]
+
+
+class LayoutBlock(BaseModel):
+    block_index: int
+    bbox: list[float]
+    text: str
+    line_count: int
+    font_names: list[str]
+    lines: list[LayoutLine]
+
+
+class DocumentPageLayoutResponse(BaseModel):
+    document_id: str
+    page_number: int
+    page_width: float
+    page_height: float
+    blocks: list[LayoutBlock]
+
+
 class SummaryResponse(BaseModel):
     document_id: str
     filename: str
@@ -111,10 +142,14 @@ def init_db() -> None:
                 document_id TEXT NOT NULL REFERENCES documents(document_id) ON DELETE CASCADE,
                 page_number INTEGER NOT NULL,
                 extracted_text TEXT NOT NULL,
+                layout_json TEXT NOT NULL DEFAULT '[]',
                 UNIQUE(document_id, page_number)
             )
             """
         )
+        page_columns = {row["name"] for row in connection.execute("PRAGMA table_info(document_pages)").fetchall()}
+        if "layout_json" not in page_columns:
+            connection.execute("ALTER TABLE document_pages ADD COLUMN layout_json TEXT NOT NULL DEFAULT '{}'")
         connection.execute("CREATE INDEX IF NOT EXISTS idx_document_pages_document_id ON document_pages(document_id)")
         # Backfill documents created before page-level storage was introduced.
         connection.execute(
@@ -134,7 +169,7 @@ def init_db() -> None:
 init_db()
 
 
-def extract_pdf(data: bytes) -> tuple[list[str], int]:
+def extract_pdf(data: bytes) -> tuple[list[str], int, list[dict]]:
     try:
         with fitz.open(stream=data, filetype="pdf") as pdf:
             if pdf.is_encrypted:
@@ -143,13 +178,64 @@ def extract_pdf(data: bytes) -> tuple[list[str], int]:
                 raise HTTPException(status_code=422, detail="The PDF contains no pages.")
             if len(pdf) > MAX_PDF_PAGES:
                 raise HTTPException(status_code=413, detail=f"PDF exceeds the {MAX_PDF_PAGES}-page limit.")
-            page_texts = [page.get_text("text").strip() for page in pdf]
+            page_texts: list[str] = []
+            page_layouts: list[dict] = []
+            for page in pdf:
+                page_texts.append(page.get_text("text").strip())
+                blocks = []
+                for block_index, block in enumerate(page.get_text("dict").get("blocks", [])):
+                    if block.get("type") != 0:
+                        continue
+                    source_lines = block.get("lines", [])
+                    line_texts = []
+                    font_names = set()
+                    line_items = []
+                    for line in source_lines:
+                        spans = line.get("spans", [])
+                        line_text = "".join(span.get("text", "") for span in spans).strip()
+                        if not line_text:
+                            continue
+                        line_texts.append(line_text)
+                        span_items = []
+                        for span in spans:
+                            span_text = span.get("text", "")
+                            if not span_text:
+                                continue
+                            font_name = span.get("font", "")
+                            if font_name:
+                                font_names.add(font_name)
+                            span_items.append({
+                                "bbox": [round(float(value), 2) for value in span.get("bbox", [])],
+                                "text": span_text,
+                                "font_name": font_name,
+                                "font_size": round(float(span.get("size", 0)), 2),
+                            })
+                        line_items.append({
+                            "bbox": [round(float(value), 2) for value in line.get("bbox", [])],
+                            "text": line_text,
+                            "spans": span_items,
+                        })
+                    block_text = "\\n".join(line_texts).strip()
+                    if block_text:
+                        blocks.append({
+                            "block_index": block_index,
+                            "bbox": [round(float(value), 2) for value in block.get("bbox", [])],
+                            "text": block_text,
+                            "line_count": len(line_texts),
+                            "font_names": sorted(font_names),
+                            "lines": line_items,
+                        })
+                page_layouts.append({
+                    "page_width": round(float(page.rect.width), 2),
+                    "page_height": round(float(page.rect.height), 2),
+                    "blocks": blocks,
+                })
             if not any(page_texts):
                 raise HTTPException(
                     status_code=422,
                     detail="No selectable text was found. Scanned PDFs require OCR, which is not included in this version.",
                 )
-            return page_texts, len(pdf)
+            return page_texts, len(pdf), page_layouts
     except HTTPException:
         raise
     except Exception as exc:
@@ -195,7 +281,7 @@ def get_document(document_id: str) -> sqlite3.Row:
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "service": "documind-api", "version": "0.2.0"}
+    return {"status": "ok", "service": "documind-api", "version": "0.4.0"}
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -208,7 +294,7 @@ main{max-width:850px;margin:7vh auto;padding:24px}.panel{background:white;border
 h1{margin:0 0 8px;font-size:2rem}p{color:#596579;line-height:1.55}.upload{border:1px dashed #9ba8bb;border-radius:12px;padding:24px;margin:22px 0;text-align:center}
 button{background:#244bd6;color:white;border:0;border-radius:9px;padding:11px 16px;font-weight:650;cursor:pointer}button:disabled{opacity:.5;cursor:wait}
 input[type=file]{max-width:100%}.result{white-space:pre-wrap;background:#f7f8fc;padding:16px;border-radius:10px;margin-top:14px;line-height:1.6}.muted{font-size:.9rem;color:#748096}
-</style></head><body><main><section class="panel"><p class="muted">DOCUMENT INTELLIGENCE · MVP 0.2</p><h1>DocuMind</h1>
+</style></head><body><main><section class="panel"><p class="muted">DOCUMENT INTELLIGENCE · MVP 0.4</p><h1>DocuMind</h1>
 <p>Upload a text-based PDF to extract its contents, generate an extractive summary, and search within your saved documents.</p>
 <div class="upload"><input id="file" type="file" accept="application/pdf"><p><button id="upload">Upload PDF</button></p><span class="muted">PDF only · Maximum 10 MB · 100 pages</span></div>
 <div id="status" role="status" aria-live="polite" class="muted">No document uploaded yet.</div><div id="output"></div></section></main>
@@ -233,7 +319,7 @@ async def upload_document(file: Annotated[UploadFile, File(description="A text-b
         raise HTTPException(status_code=413, detail="File exceeds the 10 MB limit.")
     if not data.startswith(b"%PDF-"):
         raise HTTPException(status_code=415, detail="The file does not have a valid PDF signature.")
-    page_texts, page_count = extract_pdf(data)
+    page_texts, page_count, page_layouts = extract_pdf(data)
     extracted_text = "\n\n".join(page_texts).strip()
     document_id = str(uuid.uuid4())
     with closing(connect_db()) as connection:
@@ -243,8 +329,11 @@ async def upload_document(file: Annotated[UploadFile, File(description="A text-b
             (document_id, filename, extracted_text, page_count, len(extracted_text)),
         )
         connection.executemany(
-            "INSERT INTO document_pages (document_id, page_number, extracted_text) VALUES (?, ?, ?)",
-            [(document_id, index, page_text) for index, page_text in enumerate(page_texts, start=1)],
+            "INSERT INTO document_pages (document_id, page_number, extracted_text, layout_json) VALUES (?, ?, ?, ?)",
+            [
+                (document_id, index, page_text, json.dumps(page_layouts[index - 1], ensure_ascii=False))
+                for index, page_text in enumerate(page_texts, start=1)
+            ],
         )
         connection.commit()
     return DocumentResponse(
@@ -295,6 +384,28 @@ def get_document_pages(document_id: str) -> list[DocumentPageResponse]:
         )
         for row in rows
     ]
+
+
+@app.get("/documents/{document_id}/layout", response_model=list[DocumentPageLayoutResponse])
+def get_document_layout(document_id: str) -> list[DocumentPageLayoutResponse]:
+    get_document(document_id)
+    with closing(connect_db()) as connection:
+        rows = connection.execute(
+            "SELECT document_id, page_number, layout_json FROM document_pages "
+            "WHERE document_id = ? ORDER BY page_number",
+            (document_id,),
+        ).fetchall()
+    pages = []
+    for row in rows:
+        layout = json.loads(row["layout_json"] or "{}")
+        pages.append(DocumentPageLayoutResponse(
+            document_id=row["document_id"],
+            page_number=row["page_number"],
+            page_width=layout.get("page_width", 0),
+            page_height=layout.get("page_height", 0),
+            blocks=[LayoutBlock(**block) for block in layout.get("blocks", [])],
+        ))
+    return pages
 
 
 @app.get("/documents/{document_id}/summary", response_model=SummaryResponse)

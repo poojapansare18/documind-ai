@@ -2,7 +2,7 @@
 
 A document-intelligence API and lightweight web interface that accepts text-based PDFs, extracts their text, creates extractive summaries, and searches uploaded documents.
 
-> **Current scope:** MVP 0.2. Summaries are extractive (selected from the source text), not LLM-generated. Uploaded document text and metadata are stored in a local SQLite database. Scanned PDFs and OCR are not supported yet.
+> **Current scope:** MVP 0.4. Summaries are extractive (selected from the source text), not LLM-generated. Uploaded document text and metadata are stored in a local SQLite database. Scanned PDFs and OCR are not supported yet.
 
 ## Features
 
@@ -13,6 +13,8 @@ A document-intelligence API and lightweight web interface that accepts text-base
 - SQLite persistence with page-level text records
 - Document metadata and page retrieval endpoints
 - Page-aware keyword search results with source locations
+- PDF text-block geometry: bounding boxes, line-level coordinates, span-level coordinates, font names, and font sizes
+- Layout inspection endpoint for page-by-page text blocks
 - Document listing and deletion
 - FastAPI endpoints and interactive Swagger documentation
 - Automated API tests and GitHub Actions CI
@@ -64,6 +66,7 @@ python -m pytest -v
 | GET | `/documents` | List saved documents |
 | GET | `/documents/{document_id}` | Retrieve document metadata |
 | GET | `/documents/{document_id}/pages` | Retrieve extracted text by page |
+| GET | `/documents/{document_id}/layout` | Retrieve text blocks with page coordinates and font metadata |
 | GET | `/documents/{document_id}/summary` | Return an extractive summary |
 | DELETE | `/documents/{document_id}` | Delete a saved document |
 | POST | `/documents/search` | Search saved documents by keyword; results include page numbers |
@@ -72,14 +75,14 @@ python -m pytest -v
 
 Each uploaded PDF is stored as a document record plus one text record per page. Search results include the page number, making it possible to trace a match back to its source location. Existing documents created before page-level storage are migrated into a page-one record when the application starts.
 
-This is page-aware text extraction, not layout-aware table extraction. Multi-column layouts and complex tables may still lose their visual relationships. Scanned PDFs still require OCR.
+The layout endpoint preserves text-block bounding boxes, page dimensions, block and line bounding boxes, span coordinates, font names, and font sizes from PyMuPDF. This is a geometry-preserving foundation for layout analysis, not yet automatic table reconstruction: multi-column layouts and complex tables may still require specialised detection. Scanned PDFs still require OCR.
 
 ## Next milestones
 
-1. Layout-aware extraction for tables, columns, and reading order.
-2. Chunking, embeddings, and vector retrieval for semantic search.
-3. An LLM provider adapter for grounded RAG answers with page citations.
-4. OCR, authentication, rate limiting, observability, and deployment hardening.
+1. Infer reading order and reconstruct table rows/columns from preserved geometry.
+2. Chunk layout-aware content, generate embeddings, and add vector retrieval.
+3. Add an LLM provider adapter for grounded RAG answers with page citations.
+4. Add OCR, authentication, rate limiting, observability, and deployment hardening.
 
 ## Security notes
 
