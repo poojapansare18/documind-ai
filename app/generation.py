@@ -8,6 +8,17 @@ DEFAULT_MODEL = "gpt-5.5"
 ABSTENTION = "I don't have enough information in the indexed documents to answer this question."
 
 
+def validate_answer_citations(answer: str, source_count: int) -> str:
+    """Reject non-abstaining answers that omit or invent source labels."""
+    if answer == ABSTENTION:
+        return answer
+    allowed = {f"S{index}" for index in range(1, source_count + 1)}
+    cited = set(re.findall(r"\[(S\d+)\]", answer))
+    if not cited or not cited.issubset(allowed):
+        return ABSTENTION
+    return answer
+
+
 def generate_grounded_answer(question: str, sources: list[dict]) -> str:
     """Generate an answer constrained to retrieved document excerpts."""
     api_key = os.getenv("OPENAI_API_KEY")
@@ -57,9 +68,4 @@ def generate_grounded_answer(question: str, sources: list[dict]) -> str:
     if not answer:
         raise RuntimeError("The answer-generation provider returned an empty response.")
 
-    if answer != ABSTENTION:
-        allowed = {f"S{index}" for index in range(1, len(sources) + 1)}
-        cited = set(re.findall(r"\[(S\d+)\]", answer))
-        if not cited or not cited.issubset(allowed):
-            return ABSTENTION
-    return answer
+    return validate_answer_citations(answer, len(sources))
