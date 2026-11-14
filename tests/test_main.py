@@ -2,6 +2,7 @@ import fitz
 from fastapi.testclient import TestClient
 
 import app.main as main
+from app.layout import detect_table_candidates
 
 client = TestClient(main.app)
 
@@ -203,3 +204,46 @@ def test_upload_persists_layout_geometry():
 def test_layout_endpoint_returns_404_for_unknown_document():
     response = client.get("/documents/unknown-document/layout")
     assert response.status_code == 404
+
+
+def test_table_candidate_detection_uses_repeated_aligned_rows():
+    words = []
+    rows = [
+        (10, [("Code", 10, 40), ("Title", 100, 135), ("Qty", 220, 245)]),
+        (30, [("A01", 10, 30), ("AI Systems", 100, 155), ("12", 220, 232)]),
+        (50, [("A02", 10, 30), ("Data Science", 100, 165), ("8", 220, 228)]),
+    ]
+    for line_no, (y, cells) in enumerate(rows):
+        for word_no, (text, x0, x1) in enumerate(cells):
+            words.append({
+                "x0": x0, "y0": y, "x1": x1, "y1": y + 10,
+                "text": text, "block_no": word_no, "line_no": 0, "word_no": word_no,
+            })
+    candidates = detect_table_candidates(words)
+    assert len(candidates) == 1
+    assert candidates[0]["row_count"] == 3
+    assert candidates[0]["column_count"] == 3
+    assert candidates[0]["rows"][1]["cells"][1]["text"] == "AI Systems"
+
+
+def test_table_candidate_detection_ignores_single_paragraph_line():
+    words = [
+        {"x0": 10, "y0": 10, "x1": 35, "y1": 20, "text": "This", "block_no": 0, "line_no": 0, "word_no": 0},
+        {"x0": 40, "y0": 10, "x1": 80, "y1": 20, "text": "is", "block_no": 0, "line_no": 0, "word_no": 1},
+        {"x0": 85, "y0": 10, "x1": 130, "y1": 20, "text": "normal", "block_no": 0, "line_no": 0, "word_no": 2},
+        {"x0": 135, "y0": 10, "x1": 175, "y1": 20, "text": "text", "block_no": 0, "line_no": 0, "word_no": 3},
+    ]
+    assert detect_table_candidates(words) == []
+
+
+def test_document_tables_endpoint_returns_page_results():
+    upload = client.post(
+        "/documents/upload",
+        files={"file": ("plain.pdf", make_pdf("This is a simple paragraph without a table."), "application/pdf")},
+    )
+    document_id = upload.json()["document_id"]
+    response = client.get(f"/documents/{document_id}/tables")
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+    assert response.json()[0]["page_number"] == 1
+    assert response.json()[0]["tables"] == []
