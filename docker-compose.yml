@@ -3,9 +3,21 @@ services:
     build: .
     ports:
       - "8000:8000"
+    environment:
+      DOCUMIND_API_KEY: ${DOCUMIND_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5.5}
+      DOCUMIND_EMBEDDING_MODEL: ${DOCUMIND_EMBEDDING_MODEL:-BAAI/bge-small-en-v1.5}
+      DOCUMIND_DB_PATH: ${DOCUMIND_DB_PATH:-data/documind.db}
+      FASTEMBED_CACHE_PATH: ${FASTEMBED_CACHE_PATH:-fastembed_cache}
+      DOCUMIND_OCR_LANGUAGE: ${DOCUMIND_OCR_LANGUAGE:-eng}
+      DOCUMIND_OCR_DPI: ${DOCUMIND_OCR_DPI:-200}
+      TESSDATA_PREFIX: ${TESSDATA_PREFIX:-}
     volumes:
       - documind_data:/app/data
+      - documind_models:/app/fastembed_cache
     restart: unless-stopped
 
 volumes:
   documind_data:
+  documind_models:
