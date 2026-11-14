@@ -137,6 +137,14 @@ This endpoint requires `OPENAI_API_KEY`; the default model is `gpt-5.5`, configu
 
 The MVP enforces a 10 MB upload limit and a 100-page limit. It does not yet include authentication, malware scanning, or production-grade rate limiting. OCR quality depends on scan resolution, contrast, skew, language-pack availability, and document quality; recognised text should be checked against the original page. Uploaded text is stored locally without encryption. Do not upload confidential documents to an internet-facing instance.
 
+## API security and request observability
+
+Set `DOCUMIND_API_KEY` to a long random secret to protect every `/documents` API route. When the variable is configured, requests must include the `X-API-Key` header. The workbench displays an unlock prompt and keeps the key in the current browser tab's session storage; it is not written to local storage or returned by the auth-status endpoint. When the variable is unset, the application runs without API-key authentication for local development.
+
+The service also returns a validated `X-Request-ID`, adds standard browser security headers, and writes structured request logs to standard output with method, path, status, duration, and request ID. Request logs do not include document text, API keys, or query parameters.
+
+API-key authentication is a lightweight single-secret gate, not multi-user identity management or role-based access control. Use HTTPS for any remote deployment, keep secrets out of source control, and do not expose an unauthenticated instance to the public internet.
+
 ## Run with Docker
 
 ```bash
