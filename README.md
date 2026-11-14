@@ -103,8 +103,7 @@ To index a document, call `POST /documents/{document_id}/index`. Then call `POST
 ## Next milestones
 
 1. Improve table reconstruction and infer reading order for multi-column pages.
-2. Add grounded RAG answers with page and chunk citations.
-3. Add OCR, authentication, observability, and deployment hardening.
+2. Add OCR, authentication, observability, and deployment hardening.
 
 ## Security notes
 
