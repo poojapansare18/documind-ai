@@ -147,11 +147,13 @@ API-key authentication is a lightweight single-secret gate, not multi-user ident
 
 ## Run with Docker
 
-```bash
+```powershell
+Copy-Item .env.example .env
+# Set DOCUMIND_API_KEY and OPENAI_API_KEY in .env when required.
 docker compose up --build
 ```
 
-The application is then available at http://127.0.0.1:8000. The Docker image includes Tesseract OCR and the English language pack. The SQLite database is stored in the container's `data/` directory; container recreation without a mounted volume can remove it.
+The application is then available at http://127.0.0.1:8000. The Docker image includes Tesseract OCR and the English language pack. The SQLite database is stored in the persistent `documind_data` volume, and the local embedding model cache is stored in `documind_models`. Docker Compose passes API keys and model/OCR settings from the local `.env` file into the container.
 
 ## Continuous integration
 
