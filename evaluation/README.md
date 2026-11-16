@@ -1,6 +1,6 @@
 # DocuMind retrieval benchmark
 
-This benchmark measures hybrid retrieval at the **page level** using a synthetic, 12-page corporate travel policy and 24 manually authored questions. Each question has one known relevant page. The additional pages provide distractors, so a correct top result is no longer guaranteed by retrieving the entire three-page corpus.
+This benchmark compares semantic-only, lexical-only, and reciprocal-rank-fusion retrieval at the **page level** using a synthetic, 12-page corporate travel policy and 24 manually authored questions. Each question has one known relevant page. The additional pages provide distractors, so a correct top result is no longer guaranteed by retrieving the entire three-page corpus.
 
 ## Run the benchmark
 
@@ -23,9 +23,9 @@ This benchmark measures hybrid retrieval at the **page level** using a synthetic
    python scripts/evaluate_retrieval.py --k 1 --report evaluation/results-k1.json
    ```
 
-The semantic score is cosine similarity from the configured FastEmbed model. The lexical score is BM25, calculated over indexed chunks. The API combines 75% semantic score with 25% normalised BM25 score; the response exposes the combined score plus both component scores. This is a fixed baseline weighting, not a learned re-ranker.
+The semantic score is cosine similarity from the configured FastEmbed model. The lexical score is BM25, calculated over indexed chunks. The API preserves semantic-only ranking as its default and returns semantic cosine similarity and BM25 lexical scores for analysis. The benchmark also evaluates reciprocal rank fusion (RRF), which combines rank positions rather than mixing raw score scales. RRF uses a rank constant of 60 and remains experimental.
 
-The runner creates the synthetic PDF if it does not exist, uploads it if it is not already in the document library, indexes its chunks, and requests all indexed results for each query (up to the API limit of 20). It reports the top-k metrics for hybrid, semantic-only, and lexical-only rankings. Per-query diagnostics include each candidate's component scores and the relevant page's rank under all three ranking signals. This makes it possible to identify whether score fusion, rather than candidate retrieval, caused a ranking regression. The corpus uses a versioned filename so an older three-page benchmark document in a local database is not accidentally reused. The first indexing run downloads the local embedding model. If API-key authentication is enabled, set `DOCUMIND_API_KEY` in the environment or in the root `.env` file.
+The runner creates the synthetic PDF if it does not exist, uploads it if it is not already in the document library, indexes its chunks, and requests all indexed results for each query (up to the API limit of 20). It reports top-k metrics for semantic-only, lexical-only, and RRF rankings. Per-query diagnostics include each candidate's component scores and the relevant page's rank under each ranking signal. The corpus uses a versioned filename so an older three-page benchmark document in a local database is not accidentally reused. The first indexing run downloads the local embedding model. If API-key authentication is enabled, set `DOCUMIND_API_KEY` in the environment or in the root `.env` file.
 
 ## Metrics
 
