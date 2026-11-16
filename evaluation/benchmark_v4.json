@@ -20,7 +20,7 @@
       100,
       101,
       131,
-      143,
+      144,
       146,
       158,
       159,
@@ -38,7 +38,7 @@
       "8": 100,
       "9": 101,
       "10": 131,
-      "11": 143,
+      "11": 144,
       "12": 146,
       "13": 158,
       "14": 159,
@@ -223,7 +223,7 @@
         11
       ],
       "evidence_excerpt": "Verify, as part of the initial authenticator distribution, the identity of the individual, group, role, service, or device receiving the authenticator.",
-      "annotation_rationale": "The mapped original NIST source page 143 contains the control statement or enhancement that directly supports this query.",
+      "annotation_rationale": "The mapped original NIST source page 144 contains the control statement or enhancement that directly supports this query.",
       "review_status": "pending_independent_review"
     },
     {
