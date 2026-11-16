@@ -39,7 +39,7 @@
     },
     {
       "id": "travel-01-2",
-      "query": "What is the minimum advance window for booking standard air travel?",
+      "query": "Who must authorise a business-class flight before the ticket is issued?",
       "relevant_pages": [
         1
       ],
@@ -89,7 +89,7 @@
     },
     {
       "id": "travel-04-1",
-      "query": "By when should an employee repay an unused travel advance?",
+      "query": "How many working days before departure may an employee request a travel advance?",
       "relevant_pages": [
         4
       ],
@@ -249,7 +249,7 @@
     },
     {
       "id": "procurement-04-1",
-      "query": "How should a supplier bank-account change be verified?",
+      "query": "What supplier records must Procurement verify before placing the first order?",
       "relevant_pages": [
         12
       ],
@@ -469,7 +469,7 @@
     },
     {
       "id": "security-07-1",
-      "query": "How often must vendor production access be reviewed?",
+      "query": "What contractual and business approvals are needed before a vendor can access company data?",
       "relevant_pages": [
         23
       ],
@@ -479,7 +479,7 @@
     },
     {
       "id": "security-07-2",
-      "query": "What approvals and conditions are required before a vendor accesses company data?",
+      "query": "How often must a vendor's production access be reviewed?",
       "relevant_pages": [
         23
       ],
