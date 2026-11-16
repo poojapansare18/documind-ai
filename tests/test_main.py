@@ -984,7 +984,7 @@ def test_lexical_bm25_returns_zero_for_queries_without_indexable_terms():
     assert main.lexical_bm25_scores("the and of", ["A useful document."]) == [0.0]
 
 
-def test_hybrid_search_uses_lexical_evidence_when_dense_scores_tie(monkeypatch):
+def test_semantic_search_preserves_semantic_only_ranking_by_default(monkeypatch):
     invoice = client.post(
         "/documents/upload",
         files={"file": ("hybrid-invoice.pdf", make_pdf("Invoice automation extracts supplier names and totals."), "application/pdf")},
@@ -1006,5 +1006,6 @@ def test_hybrid_search_uses_lexical_evidence_when_dense_scores_tie(monkeypatch):
     assert response.status_code == 200
     results = response.json()
     assert results[0]["filename"] == "hybrid-invoice.pdf"
+    assert results[0]["score"] == results[1]["score"]
     assert results[0]["semantic_score"] == results[1]["semantic_score"]
     assert results[0]["lexical_score"] > results[1]["lexical_score"]
