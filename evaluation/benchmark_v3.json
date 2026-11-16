@@ -1,0 +1,511 @@
+{
+  "benchmark_name": "Synthetic Multi-Domain Policy Retrieval Benchmark v3 (24 pages, 48 queries)",
+  "corpus_filename": "documind_policy_corpus_v3.pdf",
+  "corpus_path": "sample_policy_corpus_v3.pdf",
+  "corpus_generator": "create_diverse_corpus",
+  "k": 3,
+  "corpus_profile": {
+    "pages": 24,
+    "domains": [
+      "corporate travel",
+      "procurement",
+      "information security"
+    ],
+    "layout_variants": [
+      "narrative paragraphs",
+      "two-column pages",
+      "table-like policy blocks"
+    ],
+    "organisations": "fictional",
+    "content": "synthetic; no real company policy"
+  },
+  "annotation_protocol": {
+    "status": "draft_gold_labels_pending_independent_review",
+    "unit": "page-level relevance",
+    "current_label_basis": "Each query is paired with the page containing the exact supporting policy statement; evidence excerpts and rationales are supplied for reviewer verification.",
+    "required_next_step": "Two reviewers should independently judge every query-page pair, record disagreements, and adjudicate before using this corpus for production claims.",
+    "limitation": "These labels were authored as a draft benchmark and have not yet been independently reviewed. Do not describe the dataset as independently labelled until that review is completed."
+  },
+  "queries": [
+    {
+      "id": "travel-01-1",
+      "query": "How early should staff reserve a regular economy ticket?",
+      "relevant_pages": [
+        1
+      ],
+      "evidence_excerpt": "Standard economy travel should be booked at least 14 calendar days before departure.",
+      "annotation_rationale": "Page 1 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "travel-01-2",
+      "query": "What is the minimum advance window for booking standard air travel?",
+      "relevant_pages": [
+        1
+      ],
+      "evidence_excerpt": "Standard economy travel should be booked at least 14 calendar days before departure.",
+      "annotation_rationale": "Page 1 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "travel-02-1",
+      "query": "Which local cab options qualify for reimbursement?",
+      "relevant_pages": [
+        2
+      ],
+      "evidence_excerpt": "Local journeys must use licensed taxis or the approved mobility provider.",
+      "annotation_rationale": "Page 2 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "travel-02-2",
+      "query": "Can an employee claim a ride from an unapproved ride-share app?",
+      "relevant_pages": [
+        2
+      ],
+      "evidence_excerpt": "Local journeys must use licensed taxis or the approved mobility provider.",
+      "annotation_rationale": "Page 2 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "travel-03-1",
+      "query": "What is the nightly lodging ceiling for a Tier 2 city?",
+      "relevant_pages": [
+        3
+      ],
+      "evidence_excerpt": "Tier 1 cities: INR 7,500. Tier 2 cities: INR 5,500. Other locations: INR 4,000.",
+      "annotation_rationale": "Page 3 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "travel-03-2",
+      "query": "How much hotel cost can be claimed for a stay outside the listed city tiers?",
+      "relevant_pages": [
+        3
+      ],
+      "evidence_excerpt": "Tier 1 cities: INR 7,500. Tier 2 cities: INR 5,500. Other locations: INR 4,000.",
+      "annotation_rationale": "Page 3 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "travel-04-1",
+      "query": "By when should an employee repay an unused travel advance?",
+      "relevant_pages": [
+        4
+      ],
+      "evidence_excerpt": "Unused funds must be returned within 7 working days after the trip.",
+      "annotation_rationale": "Page 4 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "travel-04-2",
+      "query": "What is the deadline for returning leftover trip funds?",
+      "relevant_pages": [
+        4
+      ],
+      "evidence_excerpt": "Unused funds must be returned within 7 working days after the trip.",
+      "annotation_rationale": "Page 4 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "travel-05-1",
+      "query": "How long after a trip can an employee submit an expense claim?",
+      "relevant_pages": [
+        5
+      ],
+      "evidence_excerpt": "Expense claims must be filed within 12 calendar days after the trip ends.",
+      "annotation_rationale": "Page 5 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "travel-05-2",
+      "query": "What is the expense filing deadline measured from?",
+      "relevant_pages": [
+        5
+      ],
+      "evidence_excerpt": "Expense claims must be filed within 12 calendar days after the trip ends.",
+      "annotation_rationale": "Page 5 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "travel-06-1",
+      "query": "Who must sign an exception for a claim filed more than 30 days late?",
+      "relevant_pages": [
+        6
+      ],
+      "evidence_excerpt": "A claim filed more than 30 calendar days after the trip requires an exception signed by the Finance Director.",
+      "annotation_rationale": "Page 6 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "travel-06-2",
+      "query": "Can a line manager approve a very late expense claim?",
+      "relevant_pages": [
+        6
+      ],
+      "evidence_excerpt": "A claim filed more than 30 calendar days after the trip requires an exception signed by the Finance Director.",
+      "annotation_rationale": "Page 6 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "travel-07-1",
+      "query": "Who should be told when a business trip is cancelled, and how quickly?",
+      "relevant_pages": [
+        7
+      ],
+      "evidence_excerpt": "The traveller must notify the travel desk and line manager within one business day.",
+      "annotation_rationale": "Page 7 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "travel-07-2",
+      "query": "What is the required notification period after a trip cancellation?",
+      "relevant_pages": [
+        7
+      ],
+      "evidence_excerpt": "The traveller must notify the travel desk and line manager within one business day.",
+      "annotation_rationale": "Page 7 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "travel-08-1",
+      "query": "Which exchange rate should be applied to overseas card expenses?",
+      "relevant_pages": [
+        8
+      ],
+      "evidence_excerpt": "Convert to INR using the card issuer's posted settlement rate.",
+      "annotation_rationale": "Page 8 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "travel-08-2",
+      "query": "How should foreign-currency transactions be converted into rupees?",
+      "relevant_pages": [
+        8
+      ],
+      "evidence_excerpt": "Convert to INR using the card issuer's posted settlement rate.",
+      "annotation_rationale": "Page 8 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "procurement-01-1",
+      "query": "Does an approved purchase request allow the vendor to start work?",
+      "relevant_pages": [
+        9
+      ],
+      "evidence_excerpt": "A request is not a purchase order and does not authorise a supplier to begin work.",
+      "annotation_rationale": "Page 9 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "procurement-01-2",
+      "query": "What is the difference between a purchase request and authority to commence supply?",
+      "relevant_pages": [
+        9
+      ],
+      "evidence_excerpt": "A request is not a purchase order and does not authorise a supplier to begin work.",
+      "annotation_rationale": "Page 9 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "procurement-02-1",
+      "query": "Who approves a purchase worth INR 1,20,000 before tax?",
+      "relevant_pages": [
+        10
+      ],
+      "evidence_excerpt": "INR 25,001 to INR 2,00,000 — department head; above INR 2,00,000 — finance controller and procurement director jointly.",
+      "annotation_rationale": "Page 10 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "procurement-02-2",
+      "query": "Which two roles must jointly approve a purchase above INR 2 lakh?",
+      "relevant_pages": [
+        10
+      ],
+      "evidence_excerpt": "INR 25,001 to INR 2,00,000 — department head; above INR 2,00,000 — finance controller and procurement director jointly.",
+      "annotation_rationale": "Page 10 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "procurement-03-1",
+      "query": "How many supplier quotes are needed for a purchase above INR 50,000?",
+      "relevant_pages": [
+        11
+      ],
+      "evidence_excerpt": "Purchases above INR 50,000 require at least three comparable written supplier quotations.",
+      "annotation_rationale": "Page 11 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "procurement-03-2",
+      "query": "What justification is required if fewer than three suppliers can quote?",
+      "relevant_pages": [
+        11
+      ],
+      "evidence_excerpt": "Purchases above INR 50,000 require at least three comparable written supplier quotations.",
+      "annotation_rationale": "Page 11 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "procurement-04-1",
+      "query": "How should a supplier bank-account change be verified?",
+      "relevant_pages": [
+        12
+      ],
+      "evidence_excerpt": "Bank-detail changes require independent callback verification using a previously registered telephone number.",
+      "annotation_rationale": "Page 12 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "procurement-04-2",
+      "query": "Can procurement verify new bank details using only the phone number in the change request?",
+      "relevant_pages": [
+        12
+      ],
+      "evidence_excerpt": "Bank-detail changes require independent callback verification using a previously registered telephone number.",
+      "annotation_rationale": "Page 12 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "procurement-05-1",
+      "query": "When must an employee declare a relationship with a bidding supplier?",
+      "relevant_pages": [
+        13
+      ],
+      "evidence_excerpt": "Employees involved in supplier selection must disclose any personal, family, or financial relationship with a bidder before evaluating offers.",
+      "annotation_rationale": "Page 13 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "procurement-05-2",
+      "query": "What should happen to an evaluator who has a financial connection to a bidder?",
+      "relevant_pages": [
+        13
+      ],
+      "evidence_excerpt": "Employees involved in supplier selection must disclose any personal, family, or financial relationship with a bidder before evaluating offers.",
+      "annotation_rationale": "Page 13 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "procurement-06-1",
+      "query": "Where and when should damaged deliveries be recorded?",
+      "relevant_pages": [
+        14
+      ],
+      "evidence_excerpt": "Record shortages or damage in the goods-received note within two business days.",
+      "annotation_rationale": "Page 14 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "procurement-06-2",
+      "query": "Should an employee confirm receipt of goods that have not arrived?",
+      "relevant_pages": [
+        14
+      ],
+      "evidence_excerpt": "Record shortages or damage in the goods-received note within two business days.",
+      "annotation_rationale": "Page 14 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "procurement-07-1",
+      "query": "Which three records must match before Accounts Payable releases payment?",
+      "relevant_pages": [
+        15
+      ],
+      "evidence_excerpt": "Accounts Payable releases payment only after a three-way match of the approved purchase order, goods-received note, and supplier invoice.",
+      "annotation_rationale": "Page 15 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "procurement-07-2",
+      "query": "What happens when the invoice price or quantity does not match the purchase order?",
+      "relevant_pages": [
+        15
+      ],
+      "evidence_excerpt": "Accounts Payable releases payment only after a three-way match of the approved purchase order, goods-received note, and supplier invoice.",
+      "annotation_rationale": "Page 15 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "procurement-08-1",
+      "query": "How soon must the reason for an emergency purchase be documented?",
+      "relevant_pages": [
+        16
+      ],
+      "evidence_excerpt": "The business owner must document the reason within one business day and obtain retrospective approval within three business days.",
+      "annotation_rationale": "Page 16 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "procurement-08-2",
+      "query": "By when must retrospective approval be obtained for an emergency purchase?",
+      "relevant_pages": [
+        16
+      ],
+      "evidence_excerpt": "The business owner must document the reason within one business day and obtain retrospective approval within three business days.",
+      "annotation_rationale": "Page 16 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "security-01-1",
+      "query": "Who has authority to approve access to an application?",
+      "relevant_pages": [
+        17
+      ],
+      "evidence_excerpt": "The system owner approves access; a user's line manager alone cannot grant application permissions.",
+      "annotation_rationale": "Page 17 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "security-01-2",
+      "query": "Is a line manager's approval alone enough to grant system access?",
+      "relevant_pages": [
+        17
+      ],
+      "evidence_excerpt": "The system owner approves access; a user's line manager alone cannot grant application permissions.",
+      "annotation_rationale": "Page 17 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "security-02-1",
+      "query": "For which types of access is MFA compulsory?",
+      "relevant_pages": [
+        18
+      ],
+      "evidence_excerpt": "Multi-factor authentication is mandatory for remote access, administrator accounts, and systems containing customer or employee personal data.",
+      "annotation_rationale": "Page 18 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "security-02-2",
+      "query": "Is SMS an approved second factor under this standard?",
+      "relevant_pages": [
+        18
+      ],
+      "evidence_excerpt": "Multi-factor authentication is mandatory for remote access, administrator accounts, and systems containing customer or employee personal data.",
+      "annotation_rationale": "Page 18 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "security-03-1",
+      "query": "Where should API keys and service credentials be stored?",
+      "relevant_pages": [
+        19
+      ],
+      "evidence_excerpt": "API keys and service credentials must be stored in the approved secrets vault, never in source code or shared documents.",
+      "annotation_rationale": "Page 19 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "security-03-2",
+      "query": "May developers put service credentials in a source-code repository?",
+      "relevant_pages": [
+        19
+      ],
+      "evidence_excerpt": "API keys and service credentials must be stored in the approved secrets vault, never in source code or shared documents.",
+      "annotation_rationale": "Page 19 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "security-04-1",
+      "query": "Which classification requires named-user access and encryption?",
+      "relevant_pages": [
+        20
+      ],
+      "evidence_excerpt": "Restricted: highly sensitive data requiring named-user access and encryption.",
+      "annotation_rationale": "Page 20 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "security-04-2",
+      "query": "What controls apply to Restricted information?",
+      "relevant_pages": [
+        20
+      ],
+      "evidence_excerpt": "Restricted: highly sensitive data requiring named-user access and encryption.",
+      "annotation_rationale": "Page 20 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "security-05-1",
+      "query": "How quickly must a suspected security incident be reported?",
+      "relevant_pages": [
+        21
+      ],
+      "evidence_excerpt": "Suspected loss of a company device, credential disclosure, malware infection, or accidental data sharing must be reported to the Security Operations Centre within one hour of discovery.",
+      "annotation_rationale": "Page 21 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "security-05-2",
+      "query": "Should staff erase logs after discovering a malware infection?",
+      "relevant_pages": [
+        21
+      ],
+      "evidence_excerpt": "Suspected loss of a company device, credential disclosure, malware infection, or accidental data sharing must be reported to the Security Operations Centre within one hour of discovery.",
+      "annotation_rationale": "Page 21 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "security-06-1",
+      "query": "How long are customer support recordings normally retained?",
+      "relevant_pages": [
+        22
+      ],
+      "evidence_excerpt": "Customer support recordings are retained for 180 days unless a legal hold applies.",
+      "annotation_rationale": "Page 22 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "security-06-2",
+      "query": "What can suspend scheduled deletion of retained data?",
+      "relevant_pages": [
+        22
+      ],
+      "evidence_excerpt": "Customer support recordings are retained for 180 days unless a legal hold applies.",
+      "annotation_rationale": "Page 22 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "security-07-1",
+      "query": "How often must vendor production access be reviewed?",
+      "relevant_pages": [
+        23
+      ],
+      "evidence_excerpt": "Production access must be time-limited, approved by the system owner, and reviewed at least every 90 days.",
+      "annotation_rationale": "Page 23 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "security-07-2",
+      "query": "What approvals and conditions are required before a vendor accesses company data?",
+      "relevant_pages": [
+        23
+      ],
+      "evidence_excerpt": "Production access must be time-limited, approved by the system owner, and reviewed at least every 90 days.",
+      "annotation_rationale": "Page 23 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "security-08-1",
+      "query": "How frequently are critical production databases backed up?",
+      "relevant_pages": [
+        24
+      ],
+      "evidence_excerpt": "Critical production databases are backed up every 4 hours.",
+      "annotation_rationale": "Page 24 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "security-08-2",
+      "query": "What is the maximum recovery time objective for restoring service?",
+      "relevant_pages": [
+        24
+      ],
+      "evidence_excerpt": "Critical production databases are backed up every 4 hours.",
+      "annotation_rationale": "Page 24 contains the policy statement needed to answer this question.",
+      "review_status": "pending_independent_review"
+    }
+  ]
+}
