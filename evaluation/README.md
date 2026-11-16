@@ -27,6 +27,17 @@ The semantic score is cosine similarity from the configured FastEmbed model. The
 
 The runner creates the synthetic PDF if it does not exist, uploads it if it is not already in the document library, indexes its chunks, and requests all indexed results for each query (up to the API limit of 20). It reports top-k metrics for semantic-only, lexical-only, and RRF rankings. An optional cross-encoder experiment can rerank the same candidate set. Per-query diagnostics include each candidate's component scores and the relevant page's rank under each ranking signal. The corpus uses a versioned filename so an older three-page benchmark document in a local database is not accidentally reused. The first indexing run downloads the local embedding model. If API-key authentication is enabled, set `DOCUMIND_API_KEY` in the environment or in the root `.env` file.
 
+## Optional cross-encoder experiment
+
+To compare a second-stage cross-encoder reranker with the existing ranking variants, run:
+
+```powershell
+python scripts/evaluate_retrieval.py --k 1 --reranker-model Xenova/ms-marco-MiniLM-L-6-v2 --report evaluation/reranker-k1.json
+python scripts/evaluate_retrieval.py --k 3 --reranker-model Xenova/ms-marco-MiniLM-L-6-v2 --report evaluation/reranker-k3.json
+```
+
+The optional stage uses FastEmbed's ONNX-based `TextCrossEncoder` to score each query against the candidate texts already retrieved by semantic search. It then ranks those candidates by cross-encoder score and adds a `cross_encoder` row to `ranking_comparison`, plus per-query ranks and candidate scores. It does not change the API or its default ranking. The first run downloads the model (approximately 0.08 GB); later runs use the local model cache. See the [FastEmbed reranker guide](https://qdrant.tech/documentation/fastembed/fastembed-rerankers/).
+
 ## Metrics
 
 - **Precision@k:** fraction of the top-k returned pages that are relevant.
