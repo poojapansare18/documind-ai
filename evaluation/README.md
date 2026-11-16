@@ -34,9 +34,10 @@ To compare a second-stage cross-encoder reranker with the existing ranking varia
 ```powershell
 python scripts/evaluate_retrieval.py --k 1 --reranker-model Xenova/ms-marco-MiniLM-L-6-v2 --report evaluation/reranker-k1.json
 python scripts/evaluate_retrieval.py --k 3 --reranker-model Xenova/ms-marco-MiniLM-L-6-v2 --report evaluation/reranker-k3.json
+python scripts/evaluate_retrieval.py --k 3 --reranker-model Xenova/ms-marco-MiniLM-L-6-v2 --reranker-top-n 3 --report evaluation/reranker-top3-k3.json
 ```
 
-The optional stage uses FastEmbed's ONNX-based `TextCrossEncoder` to score each query against the candidate texts already retrieved by semantic search. It then ranks those candidates by cross-encoder score and adds a `cross_encoder` row to `ranking_comparison`, plus per-query ranks and candidate scores. It does not change the API or its default ranking. The first run downloads the model (approximately 0.08 GB); later runs use the local model cache. See the [FastEmbed reranker guide](https://qdrant.tech/documentation/fastembed/fastembed-rerankers/).
+The optional stage uses FastEmbed's ONNX-based `TextCrossEncoder` to score each query against the candidate texts already retrieved by semantic search. It then ranks those candidates by cross-encoder score and adds a `cross_encoder` row to `ranking_comparison`, plus per-query ranks and candidate scores. Add `--reranker-top-n 3` to also evaluate a bounded variant: only the first three semantic candidates are reordered by cross-encoder score, while all remaining candidates retain their original semantic order. This is an offline safeguard experiment, not an API setting. It does not change the API or its default ranking. The first run downloads the model (approximately 0.08 GB); later runs use the local model cache. See the [FastEmbed reranker guide](https://qdrant.tech/documentation/fastembed/fastembed-rerankers/).
 
 ## Metrics
 
@@ -94,3 +95,18 @@ The optional reranker was evaluated with `Xenova/ms-marco-MiniLM-L-6-v2` against
 **Interpretation:** the cross-encoder improves top-1 accuracy from 21/24 to 22/24 queries. At k=3, it has a slightly higher MRR than semantic-only, but it fails to keep one relevant page in the top three. The `claim-required-evidence` query has relevant page 5: semantic-only ranks it third, while the cross-encoder moves it to sixth. Another query, `late-claim-authority`, has the relevant page at rank 2 under both methods.
 
 **Decision:** this is a promising top-result improvement, but not a consistent top-k improvement. Do not replace semantic-only ranking in the API yet. Keep the cross-encoder as an optional offline experiment. Before production use, investigate the top-k regression, measure latency and memory, and validate against a larger, diverse, independently labelled document set. The benchmark remains synthetic and cannot establish general performance.
+
+
+## Bounded cross-encoder follow-up
+
+A post-run analysis of the supplied 24-query k=3 report simulated a bounded reranker that reorders only the semantic top three candidates and leaves the remaining semantic order unchanged. The results were:
+
+| Ranking | Correct at rank 1 | Relevant page in top 3 | MRR@3 |
+|---|---:|---:|---:|
+| Semantic-only | 21/24 | 24/24 | 0.930556 |
+| Full cross-encoder | 22/24 | 23/24 | 0.937500 |
+| Cross-encoder limited to semantic top 3 | **22/24** | **24/24** | **0.951389** |
+
+For `claim-required-evidence`, the relevant page was initially at semantic rank 3 but fell to cross-encoder rank 6. Limiting reordering to the semantic top three retains that page at rank 3. Across this supplied report, the bounded simulation retains the full reranker's top-1 hit count while restoring top-3 recall.
+
+**Interpretation and limitation:** this is a retrospective simulation using the saved candidate scores, not a fresh model run. It is based on one small synthetic corpus and does not justify enabling reranking in the API. The `--reranker-top-n` option makes the bounded variant reproducible in future benchmark runs. Measure latency and evaluate on diverse, independently labelled PDFs before considering production use.
