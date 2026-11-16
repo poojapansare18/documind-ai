@@ -71,3 +71,26 @@ The following results were produced by running the benchmark against the 12-page
 **Interpretation:** semantic-only is the strongest of the three tested rankings at both cutoffs. RRF improves on BM25 alone but does not beat semantic-only: it lowers top-1 accuracy from 87.50% to 70.83%, and lowers MRR@3 from 0.930556 to 0.819444. For the `hotel-over-limit` query, semantic retrieval placed the relevant page first while RRF moved it to rank 2.
 
 **Decision:** do not enable weighted fusion or RRF as the default retrieval strategy. Keep semantic-only ranking in the API. Retain BM25 and RRF only as offline comparison and diagnostic tools. These measurements are specific to this small synthetic corpus and do not establish that semantic-only will win on every real document collection.
+
+
+## Recorded cross-encoder comparison (24-query synthetic corpus)
+
+The optional reranker was evaluated with `Xenova/ms-marco-MiniLM-L-6-v2` against the same 12-page candidate set.
+
+| Ranking | Precision@1 | Recall@1 | MRR@1 | nDCG@1 |
+|---|---:|---:|---:|---:|
+| Semantic-only | 0.875000 | 0.875000 | 0.875000 | 0.875000 |
+| BM25 | 0.541667 | 0.541667 | 0.541667 | 0.541667 |
+| RRF | 0.708333 | 0.708333 | 0.708333 | 0.708333 |
+| Cross-encoder | **0.916667** | **0.916667** | **0.916667** | **0.916667** |
+
+| Ranking | Precision@3 | Recall@3 | MRR@3 | nDCG@3 |
+|---|---:|---:|---:|---:|
+| Semantic-only | **0.333333** | **1.000000** | 0.930556 | **0.948411** |
+| BM25 | 0.250000 | 0.750000 | 0.631944 | 0.662200 |
+| RRF | 0.319444 | 0.958333 | 0.819444 | 0.855155 |
+| Cross-encoder | 0.319444 | 0.958333 | **0.937500** | 0.942955 |
+
+**Interpretation:** the cross-encoder improves top-1 accuracy from 21/24 to 22/24 queries. At k=3, it has a slightly higher MRR than semantic-only, but it fails to keep one relevant page in the top three. The `claim-required-evidence` query has relevant page 5: semantic-only ranks it third, while the cross-encoder moves it to sixth. Another query, `late-claim-authority`, has the relevant page at rank 2 under both methods.
+
+**Decision:** this is a promising top-result improvement, but not a consistent top-k improvement. Do not replace semantic-only ranking in the API yet. Keep the cross-encoder as an optional offline experiment. Before production use, investigate the top-k regression, measure latency and memory, and validate against a larger, diverse, independently labelled document set. The benchmark remains synthetic and cannot establish general performance.
