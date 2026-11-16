@@ -39,3 +39,24 @@ Results are averaged across all benchmark queries and also reported per query. W
 ## Scope and limitations
 
 This is a repeatable engineering baseline, not a broad evaluation of real-world PDFs. The corpus is synthetic, has one short page per topic, and uses manually authored queries. It evaluates page retrieval, not answer factuality, citation entailment, OCR accuracy, table extraction accuracy, or performance on diverse document layouts. Do not present these scores as an external industry benchmark. Add representative, permission-cleared documents and independently reviewed relevance labels before making production claims.
+
+
+## Recorded comparison (24-query synthetic corpus)
+
+The following results were produced by running the benchmark against the 12-page corpus with the local FastEmbed model. The API's production search order remains semantic-only.
+
+| Ranking | Precision@1 | Recall@1 | MRR@1 | nDCG@1 |
+|---|---:|---:|---:|---:|
+| Semantic-only | 0.875000 | 0.875000 | 0.875000 | 0.875000 |
+| Lexical-only (BM25) | 0.541667 | 0.541667 | 0.541667 | 0.541667 |
+| RRF (rank constant 60) | 0.708333 | 0.708333 | 0.708333 | 0.708333 |
+
+| Ranking | Precision@3 | Recall@3 | MRR@3 | nDCG@3 |
+|---|---:|---:|---:|---:|
+| Semantic-only | 0.333333 | 1.000000 | 0.930556 | 0.948411 |
+| Lexical-only (BM25) | 0.250000 | 0.750000 | 0.631944 | 0.662200 |
+| RRF (rank constant 60) | 0.319444 | 0.958333 | 0.819444 | 0.855155 |
+
+**Interpretation:** semantic-only is the strongest of the three tested rankings at both cutoffs. RRF improves on BM25 alone but does not beat semantic-only: it lowers top-1 accuracy from 87.50% to 70.83%, and lowers MRR@3 from 0.930556 to 0.819444. For the `hotel-over-limit` query, semantic retrieval placed the relevant page first while RRF moved it to rank 2.
+
+**Decision:** do not enable weighted fusion or RRF as the default retrieval strategy. Keep semantic-only ranking in the API. Retain BM25 and RRF only as offline comparison and diagnostic tools. These measurements are specific to this small synthetic corpus and do not establish that semantic-only will win on every real document collection.
