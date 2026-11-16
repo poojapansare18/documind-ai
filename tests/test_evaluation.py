@@ -51,16 +51,18 @@ def test_evaluation_rejects_invalid_k_and_empty_cases():
         evaluate_retrieval([], 3)
 
 
-
-def test_synthetic_benchmark_corpus_has_three_ground_truth_pages(tmp_path):
+def test_synthetic_benchmark_corpus_has_twelve_ground_truth_pages(tmp_path):
     import fitz
 
-    from scripts.create_evaluation_corpus import create_corpus
+    from scripts.create_evaluation_corpus import PAGES, create_corpus
 
-    pdf_path = create_corpus(tmp_path / "travel-policy.pdf")
+    pdf_path = create_corpus(tmp_path / "travel-policy-v2.pdf")
     document = fitz.open(pdf_path)
-    assert document.page_count == 3
+    assert document.page_count == 12
+    assert len(PAGES) == 12
     assert "14 calendar days" in document[0].get_text()
-    assert "INR 6,000 per night" in document[1].get_text()
-    assert "10 calendar days" in document[2].get_text()
+    assert "INR 6,000 per night" in document[2].get_text()
+    assert "INR 1,200 per employee" in document[3].get_text()
+    assert "finance controller" in document[5].get_text()
+    assert "12 months" in document[11].get_text()
     document.close()
