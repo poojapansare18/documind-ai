@@ -904,11 +904,6 @@ def semantic_search(request: SemanticSearchRequest) -> list[SemanticSearchResult
     for row, lexical_score in zip(compatible_rows, lexical_scores):
         vector = json.loads(row["vector_json"])
         semantic_score = cosine_similarity(query_vector, vector)
-        normalised_lexical_score = (
-            lexical_score / maximum_lexical_score
-            if maximum_lexical_score > 0
-            else 0.0
-        )
         results.append(SemanticSearchResult(
             document_id=row["document_id"],
             filename=row["filename"],
@@ -925,7 +920,7 @@ def semantic_search(request: SemanticSearchRequest) -> list[SemanticSearchResult
 
     return sorted(
         results,
-        key=lambda result: (result.semantic_score, result.lexical_score),
+        key=lambda result: result.semantic_score,
         reverse=True,
     )[:request.limit]
 
