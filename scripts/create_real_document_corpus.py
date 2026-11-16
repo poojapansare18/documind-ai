@@ -13,7 +13,7 @@ SOURCE_URL = (
     "https://csrc.nist.gov/CSRC/media/Projects/risk-management/"
     "800-53%20Downloads/800-53r5/SP_800-53_v5_1-derived-OSCAL.pdf"
 )
-SOURCE_PDF_PAGES = [19, 24, 39, 69, 82, 100, 131, 143, 158, 163, 313]
+SOURCE_PDF_PAGES = [19, 22, 24, 39, 69, 70, 82, 100, 101, 131, 143, 146, 158, 159, 163, 313]
 
 
 def create_real_nist_corpus(output_path: Path, source_path: Path | None = None) -> Path:
