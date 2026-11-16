@@ -190,6 +190,8 @@ class SemanticSearchResult(BaseModel):
     start_char: int
     end_char: int
     score: float
+    semantic_score: float
+    lexical_score: float
     text: str
     embedding_model: str
 
@@ -805,6 +807,58 @@ def cosine_similarity(left: list[float], right: list[float]) -> float:
     return sum(a * b for a, b in zip(left, right)) / (left_norm * right_norm)
 
 
+def lexical_bm25_scores(query: str, documents: list[str]) -> list[float]:
+    """Calculate BM25 relevance scores for a query against a small in-memory corpus."""
+    if not documents:
+        return []
+    tokenise = lambda value: [
+        token for token in re.findall(r"[a-z0-9]+", value.lower())
+        if token not in STOP_WORDS and len(token) > 1
+    ]
+    query_terms = tokenise(query)
+    document_terms = [tokenise(document) for document in documents]
+    if not query_terms:
+        return [0.0] * len(documents)
+
+    document_count = len(document_terms)
+    average_length = sum(len(tokens) for tokens in document_terms) / document_count
+    average_length = max(average_length, 1.0)
+    frequencies = [Counter(tokens) for tokens in document_terms]
+    document_frequency = Counter(
+        term for term in set(query_terms)
+        for _ in [0]
+        if any(term in counts for counts in frequencies)
+    )
+    # Count each query term once per document for inverse-document frequency.
+    document_frequency = {
+        term: sum(1 for counts in frequencies if counts.get(term, 0) > 0)
+        for term in set(query_terms)
+    }
+
+    k1 = 1.5
+    b = 0.75
+    scores = []
+    for tokens, counts in zip(document_terms, frequencies):
+        length = len(tokens)
+        score = 0.0
+        for term in query_terms:
+            term_frequency = counts.get(term, 0)
+            if not term_frequency:
+                continue
+            df = document_frequency[term]
+            inverse_document_frequency = math.log(
+                1.0 + (document_count - df + 0.5) / (df + 0.5)
+            )
+            denominator = term_frequency + k1 * (
+                1.0 - b + b * length / average_length
+            )
+            score += inverse_document_frequency * (
+                term_frequency * (k1 + 1.0) / denominator
+            )
+        scores.append(score)
+    return scores
+
+
 @app.post("/documents/semantic-search", response_model=list[SemanticSearchResult])
 def semantic_search(request: SemanticSearchRequest) -> list[SemanticSearchResult]:
     if request.document_id:
@@ -836,12 +890,32 @@ def semantic_search(request: SemanticSearchRequest) -> list[SemanticSearchResult
             detail="No compatible embeddings are indexed. Call POST /documents/{document_id}/index first.",
         )
 
+    compatible_rows = [
+        row for row in rows
+        if row["dimensions"] == len(query_vector)
+    ]
+    if not compatible_rows:
+        raise HTTPException(
+            status_code=409,
+            detail="No indexed chunks have embeddings compatible with the query model.",
+        )
+
+    lexical_scores = lexical_bm25_scores(
+        request.query,
+        [row["chunk_text"] for row in compatible_rows],
+    )
+    maximum_lexical_score = max(lexical_scores, default=0.0)
     results = []
-    for row in rows:
-        if row["dimensions"] != len(query_vector):
-            continue
+    for row, lexical_score in zip(compatible_rows, lexical_scores):
         vector = json.loads(row["vector_json"])
-        score = cosine_similarity(query_vector, vector)
+        semantic_score = cosine_similarity(query_vector, vector)
+        normalised_lexical_score = (
+            lexical_score / maximum_lexical_score
+            if maximum_lexical_score > 0
+            else 0.0
+        )
+        # Semantic relevance remains the primary signal; BM25 adds exact-term evidence.
+        hybrid_score = 0.75 * semantic_score + 0.25 * normalised_lexical_score
         results.append(SemanticSearchResult(
             document_id=row["document_id"],
             filename=row["filename"],
@@ -849,12 +923,18 @@ def semantic_search(request: SemanticSearchRequest) -> list[SemanticSearchResult
             chunk_index=row["chunk_index"],
             start_char=row["start_char"],
             end_char=row["end_char"],
-            score=round(score, 6),
+            score=round(hybrid_score, 6),
+            semantic_score=round(semantic_score, 6),
+            lexical_score=round(lexical_score, 6),
             text=row["chunk_text"],
             embedding_model=row["model_name"],
         ))
 
-    return sorted(results, key=lambda result: result.score, reverse=True)[:request.limit]
+    return sorted(
+        results,
+        key=lambda result: (result.score, result.semantic_score),
+        reverse=True,
+    )[:request.limit]
 
 
 @app.post("/documents/ask", response_model=AskResponse)
