@@ -54,7 +54,7 @@ flowchart TD
     N --> U
     U --> O[Grounded answer generation]
     O --> P[OpenAI Responses API]
-    E --> N[List / delete documents]
+    E --> V[List / delete documents]
 ```
 
 ## Web workbench
