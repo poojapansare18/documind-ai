@@ -132,7 +132,7 @@ For `claim-required-evidence`, the relevant page was initially at semantic rank 
 
 v4 adds a reproducible real-source retrieval benchmark using 16 selected pages from the NIST-hosted **SP 800-53 Revision 5.1 controls-only PDF derivative** and 22 manually authored questions. It covers Access Control, Audit and Accountability, Configuration Management, Contingency Planning, Identification and Authentication, Incident Response, and System and Communications Protection.
 
-The official source PDF is downloaded on first run by `scripts/create_real_document_corpus.py`. The script extracts original PDF pages 19, 22, 24, 39, 69, 70, 82, 100, 101, 131, 143, 146, 158, 159, 163, and 313 into a 16-page evaluation corpus. The benchmark maps compact output pages 1–16 back to those original source PDF pages in `corpus_profile.output_page_mapping`.
+The official source PDF is downloaded on first run by `scripts/create_real_document_corpus.py`. The script extracts original PDF pages 19, 22, 24, 39, 69, 70, 82, 100, 101, 131, 144, 146, 158, 159, 163, and 313 into a 16-page evaluation corpus. The benchmark maps compact output pages 1–16 back to those original source PDF pages in `corpus_profile.output_page_mapping`.
 
 Official source: [NIST SP 800-53 Downloads](https://csrc.nist.gov/projects/risk-management/sp800-53-controls/downloads). The selected PDF is a derivative controls catalogue containing controls and enhancements only; it is not the complete normative publication and omits broader background and implementation guidance. Refer to the normative NIST publication for authoritative interpretation.
 
