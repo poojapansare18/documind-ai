@@ -66,3 +66,37 @@ def test_synthetic_benchmark_corpus_has_twelve_ground_truth_pages(tmp_path):
     assert "finance controller" in document[5].get_text()
     assert "12 months" in document[11].get_text()
     document.close()
+
+
+def test_retrieval_diagnostics_explain_relevant_rank_and_score_gap():
+    from app.evaluation import build_retrieval_diagnostics
+
+    report = build_retrieval_diagnostics(
+        query="Who approves a late claim?",
+        ranked_results=[
+            {"page_number": 9, "chunk_index": 0, "score": 0.82, "text": "Cancellation rules."},
+            {"page_number": 6, "chunk_index": 0, "score": 0.77, "text": "Late claims need finance approval."},
+            {"page_number": 3, "chunk_index": 0, "score": 0.61, "text": "Hotel limits."},
+        ],
+        relevant_pages=[6],
+    )
+    assert report["relevant_rank"] == 2
+    assert report["top_score"] == 0.82
+    assert report["relevant_score"] == 0.77
+    assert report["top_to_relevant_score_gap"] == 0.05
+    assert report["ranked_results"][1]["text_preview"] == "Late claims need finance approval."
+
+
+def test_retrieval_diagnostics_report_missing_relevant_page():
+    from app.evaluation import build_retrieval_diagnostics
+
+    report = build_retrieval_diagnostics(
+        query="Which page contains the policy?",
+        ranked_results=[
+            {"page_number": 2, "chunk_index": 0, "score": 0.7, "text": "Ground transport."},
+        ],
+        relevant_pages=[8],
+    )
+    assert report["relevant_rank"] is None
+    assert report["relevant_score"] is None
+    assert report["top_to_relevant_score_gap"] is None

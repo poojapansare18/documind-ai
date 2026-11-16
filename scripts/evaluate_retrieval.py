@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 load_dotenv(ROOT / ".env")
 
-from app.evaluation import evaluate_retrieval
+from app.evaluation import build_retrieval_diagnostics, evaluate_retrieval
 from scripts.create_evaluation_corpus import create_corpus
 
 
@@ -53,6 +53,7 @@ def run_benchmark(base_url: str, benchmark_path: Path, k: int | None = None) -> 
         index_result = index_response.json()
 
         cases = []
+        diagnostics = []
         for query in benchmark["queries"]:
             response = client.post(
                 "/documents/semantic-search",
@@ -67,8 +68,15 @@ def run_benchmark(base_url: str, benchmark_path: Path, k: int | None = None) -> 
                 "retrieved": ranked_pages,
                 "relevant": [str(page) for page in query["relevant_pages"]],
             })
+            diagnostics.append(build_retrieval_diagnostics(
+                query=query["query"],
+                ranked_results=results,
+                relevant_pages=query["relevant_pages"],
+            ))
 
     report = evaluate_retrieval(cases, top_k)
+    for metric_row, diagnostic in zip(report["per_query"], diagnostics):
+        metric_row.update(diagnostic)
     report["benchmark_name"] = benchmark["benchmark_name"]
     report["document"] = {
         "document_id": document_id,
