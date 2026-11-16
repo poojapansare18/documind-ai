@@ -135,6 +135,18 @@ def reciprocal_rank_fusion(
     return sorted(fused.values(), key=lambda item: (item["rrf_score"], item.get("semantic_score", 0.0)), reverse=True)
 
 
+def rerank_top_n_candidates(
+    semantic_ranked: list[dict], scores: list[float], top_n: int
+) -> list[dict]:
+    """Rerank only the semantic top-N candidates; preserve the remaining order."""
+    if top_n < 1:
+        raise ValueError("top_n must be at least 1.")
+    if len(semantic_ranked) != len(scores):
+        raise ValueError("The reranker must return exactly one score per candidate.")
+    reranked_head = rank_candidates_by_scores(semantic_ranked[:top_n], scores[:top_n])
+    return reranked_head + semantic_ranked[top_n:]
+
+
 def rank_candidates_by_scores(candidates: list[dict], scores: list[float]) -> list[dict]:
     """Attach cross-encoder scores and sort candidates from most to least relevant."""
     if len(candidates) != len(scores):
