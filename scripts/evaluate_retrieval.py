@@ -20,7 +20,7 @@ from app.evaluation import (
     rerank_top_n_candidates,
     reciprocal_rank_fusion,
 )
-from scripts.create_evaluation_corpus import create_corpus
+from scripts.create_evaluation_corpus import create_corpus, create_diverse_corpus
 
 
 def run_benchmark(
@@ -34,7 +34,13 @@ def run_benchmark(
     top_k = int(benchmark.get("k", 5)) if k is None else k
     corpus_path = benchmark_path.parent / benchmark["corpus_path"]
     if not corpus_path.exists():
-        create_corpus(corpus_path)
+        generator = benchmark.get("corpus_generator", "create_corpus")
+        if generator == "create_diverse_corpus":
+            create_diverse_corpus(corpus_path)
+        elif generator == "create_corpus":
+            create_corpus(corpus_path)
+        else:
+            raise ValueError(f"Unsupported corpus generator: {generator}")
 
     headers = {}
     api_key = os.getenv("DOCUMIND_API_KEY")
