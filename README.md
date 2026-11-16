@@ -140,7 +140,7 @@ This endpoint requires `OPENAI_API_KEY`; the default model is `gpt-5.5`, configu
 
 ## Retrieval evaluation
 
-DocuMind includes a repeatable page-level semantic retrieval benchmark. It generates a synthetic 12-page travel policy with 24 manually authored queries and known relevant pages, uploads and indexes it through the API, and reports Precision@k, Recall@k, MRR@k, and nDCG@k. Run it with:
+DocuMind includes a repeatable page-level hybrid retrieval benchmark. It generates a synthetic 12-page travel policy with 24 manually authored queries and known relevant pages, uploads and indexes it through the API, and reports Precision@k, Recall@k, MRR@k, and nDCG@k. Run it with:
 
 ```powershell
 python scripts/evaluate_retrieval.py --k 3 --report evaluation/results.json
