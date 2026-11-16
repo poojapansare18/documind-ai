@@ -73,7 +73,7 @@
       "relevant_pages": [
         3
       ],
-      "evidence_excerpt": "Tier 1 cities: INR 7,500. Tier 2 cities: INR 5,500. Other locations: INR 4,000.",
+      "evidence_excerpt": "Accommodation ceilings are stated per night, before applicable taxes. Tier 1 cities: INR 7,500. Tier 2 cities: INR 5,500. Other locations: INR 4,000.",
       "annotation_rationale": "Page 3 contains the policy statement needed to answer this question.",
       "review_status": "pending_independent_review"
     },
@@ -93,7 +93,7 @@
       "relevant_pages": [
         4
       ],
-      "evidence_excerpt": "Unused funds must be returned within 7 working days after the trip.",
+      "evidence_excerpt": "An employee may request an advance no earlier than 15 working days and no later than 5 working days before departure.",
       "annotation_rationale": "Page 4 contains the policy statement needed to answer this question.",
       "review_status": "pending_independent_review"
     },
@@ -473,7 +473,7 @@
       "relevant_pages": [
         23
       ],
-      "evidence_excerpt": "Production access must be time-limited, approved by the system owner, and reviewed at least every 90 days.",
+      "evidence_excerpt": "A vendor may access company data only under an executed data-processing agreement and a named business sponsor.",
       "annotation_rationale": "Page 23 contains the policy statement needed to answer this question.",
       "review_status": "pending_independent_review"
     },
