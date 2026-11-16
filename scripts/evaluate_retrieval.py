@@ -54,27 +54,63 @@ def run_benchmark(base_url: str, benchmark_path: Path, k: int | None = None) -> 
 
         cases = []
         diagnostics = []
+        semantic_cases = []
+        lexical_cases = []
         for query in benchmark["queries"]:
             response = client.post(
                 "/documents/semantic-search",
-                json={"query": query["query"], "limit": top_k, "document_id": document_id},
+                json={"query": query["query"], "limit": 20, "document_id": document_id},
                 headers=headers,
             )
             response.raise_for_status()
             results = response.json()
-            ranked_pages = list(dict.fromkeys(str(item["page_number"]) for item in results))
+
+            def page_order(items: list[dict]) -> list[str]:
+                return list(dict.fromkeys(str(item["page_number"]) for item in items))
+
+            hybrid_pages = page_order(results)
+            semantic_results = sorted(results, key=lambda item: item["semantic_score"], reverse=True)
+            lexical_results = sorted(results, key=lambda item: item["lexical_score"], reverse=True)
+            relevant = [str(page) for page in query["relevant_pages"]]
             cases.append({
                 "id": query["id"],
-                "retrieved": ranked_pages,
-                "relevant": [str(page) for page in query["relevant_pages"]],
+                "retrieved": hybrid_pages[:top_k],
+                "relevant": relevant,
             })
-            diagnostics.append(build_retrieval_diagnostics(
+            semantic_cases.append({
+                "id": query["id"],
+                "retrieved": page_order(semantic_results)[:top_k],
+                "relevant": relevant,
+            })
+            lexical_cases.append({
+                "id": query["id"],
+                "retrieved": page_order(lexical_results)[:top_k],
+                "relevant": relevant,
+            })
+            diagnostic = build_retrieval_diagnostics(
                 query=query["query"],
                 ranked_results=results,
                 relevant_pages=query["relevant_pages"],
-            ))
+            )
+            relevant_set = set(relevant)
+            semantic_ranked = page_order(semantic_results)
+            lexical_ranked = page_order(lexical_results)
+            diagnostic["semantic_relevant_rank"] = next(
+                (i for i, page in enumerate(semantic_ranked, 1) if page in relevant_set), None
+            )
+            diagnostic["lexical_relevant_rank"] = next(
+                (i for i, page in enumerate(lexical_ranked, 1) if page in relevant_set), None
+            )
+            diagnostic["semantic_top_pages"] = semantic_ranked[:top_k]
+            diagnostic["lexical_top_pages"] = lexical_ranked[:top_k]
+            diagnostics.append(diagnostic)
 
     report = evaluate_retrieval(cases, top_k)
+    report["ranking_comparison"] = {
+        "hybrid": report["metrics"],
+        "semantic_only": evaluate_retrieval(semantic_cases, top_k)["metrics"],
+        "lexical_only": evaluate_retrieval(lexical_cases, top_k)["metrics"],
+    }
     for metric_row, diagnostic in zip(report["per_query"], diagnostics):
         metric_row.update(diagnostic)
     report["benchmark_name"] = benchmark["benchmark_name"]
@@ -90,7 +126,7 @@ def run_benchmark(base_url: str, benchmark_path: Path, k: int | None = None) -> 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Evaluate DocuMind semantic retrieval against a page-level ground-truth benchmark."
+        description="Evaluate DocuMind retrieval ranking variants against a page-level ground-truth benchmark."
     )
     parser.add_argument("--base-url", default="http://127.0.0.1:8000")
     parser.add_argument(
