@@ -1,33 +1,176 @@
 {
-  "benchmark_name": "Synthetic Corporate Travel Policy",
-  "corpus_filename": "documind_travel_policy_benchmark.pdf",
-  "corpus_path": "sample_travel_policy.pdf",
+  "benchmark_name": "Synthetic Corporate Travel Policy v2 (12 pages, 24 queries)",
+  "corpus_filename": "documind_travel_policy_benchmark_v2.pdf",
+  "corpus_path": "sample_travel_policy_v2.pdf",
   "k": 3,
   "queries": [
     {
       "id": "flight-booking-window",
-      "query": "How many days in advance should employees book economy flights?",
-      "relevant_pages": [1]
+      "query": "How far ahead should an employee arrange an economy flight?",
+      "relevant_pages": [
+        1
+      ]
     },
     {
-      "id": "hotel-reimbursement-limit",
-      "query": "What is the maximum hotel reimbursement per night?",
-      "relevant_pages": [2]
+      "id": "business-class-approval",
+      "query": "Who has to authorise a business class airline ticket?",
+      "relevant_pages": [
+        1
+      ]
     },
     {
-      "id": "meal-allowance",
-      "query": "What is the daily meal allowance for employees?",
-      "relevant_pages": [2]
+      "id": "approved-ground-transport",
+      "query": "Which local transport providers are permitted for work journeys?",
+      "relevant_pages": [
+        2
+      ]
     },
     {
-      "id": "expense-submission-deadline",
-      "query": "How soon after a trip must employees submit expense claims?",
-      "relevant_pages": [3]
+      "id": "private-car-mileage",
+      "query": "What is the per kilometre reimbursement for using a personal car?",
+      "relevant_pages": [
+        2
+      ]
     },
     {
-      "id": "late-claim-approval",
-      "query": "Who must approve expense claims submitted after thirty calendar days?",
-      "relevant_pages": [3]
+      "id": "hotel-nightly-cap",
+      "query": "What is the maximum accommodation amount allowed for one night?",
+      "relevant_pages": [
+        3
+      ]
+    },
+    {
+      "id": "hotel-over-limit",
+      "query": "What must happen before reserving a room that costs more than the limit?",
+      "relevant_pages": [
+        3
+      ]
+    },
+    {
+      "id": "daily-food-budget",
+      "query": "How much can a staff member claim each day for meals?",
+      "relevant_pages": [
+        4
+      ]
+    },
+    {
+      "id": "provided-meals",
+      "query": "How should complimentary meals supplied at an event affect the allowance?",
+      "relevant_pages": [
+        4
+      ]
+    },
+    {
+      "id": "claim-deadline",
+      "query": "Within how many days of returning must a traveller file expenses?",
+      "relevant_pages": [
+        5
+      ]
+    },
+    {
+      "id": "claim-required-evidence",
+      "query": "Which details and documents must accompany a reimbursement request?",
+      "relevant_pages": [
+        5
+      ]
+    },
+    {
+      "id": "late-claim-authority",
+      "query": "Who can approve an expense report filed over a month after travel?",
+      "relevant_pages": [
+        6
+      ]
+    },
+    {
+      "id": "late-claim-explanation",
+      "query": "What additional justification is needed for a delayed reimbursement submission?",
+      "relevant_pages": [
+        6
+      ]
+    },
+    {
+      "id": "international-insurance",
+      "query": "What protection is supplied during authorised overseas work trips?",
+      "relevant_pages": [
+        7
+      ]
+    },
+    {
+      "id": "insurance-holiday-extension",
+      "query": "Does company cover apply when an employee adds personal vacation days?",
+      "relevant_pages": [
+        7
+      ]
+    },
+    {
+      "id": "travel-advance-notice",
+      "query": "How early should a worker apply for trip spending money?",
+      "relevant_pages": [
+        8
+      ]
+    },
+    {
+      "id": "unused-advance-return",
+      "query": "When must leftover travel advance money be paid back?",
+      "relevant_pages": [
+        8
+      ]
+    },
+    {
+      "id": "cancelled-trip-notice",
+      "query": "Who needs to be informed when an official journey is called off?",
+      "relevant_pages": [
+        9
+      ]
+    },
+    {
+      "id": "cancellation-fees",
+      "query": "Are charges caused by an employee's personal itinerary change claimable?",
+      "relevant_pages": [
+        9
+      ]
+    },
+    {
+      "id": "foreign-exchange-rate",
+      "query": "Which exchange rate should be used to convert overseas purchases to INR?",
+      "relevant_pages": [
+        10
+      ]
+    },
+    {
+      "id": "foreign-currency-fees",
+      "query": "How should international card conversion charges be shown in a claim?",
+      "relevant_pages": [
+        10
+      ]
+    },
+    {
+      "id": "client-meal-approval",
+      "query": "Who must approve a meal with a business customer before it takes place?",
+      "relevant_pages": [
+        11
+      ]
+    },
+    {
+      "id": "client-meal-record",
+      "query": "What information must be recorded when claiming a customer dinner?",
+      "relevant_pages": [
+        11
+      ]
+    },
+    {
+      "id": "receipt-retention",
+      "query": "For how long should original invoices be kept after repayment?",
+      "relevant_pages": [
+        12
+      ]
+    },
+    {
+      "id": "audit-evidence",
+      "query": "What kind of digital receipt copies are acceptable if Finance audits a claim?",
+      "relevant_pages": [
+        12
+      ]
     }
   ]
 }
