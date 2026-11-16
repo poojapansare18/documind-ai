@@ -6,6 +6,7 @@ from app.evaluation import (
     precision_at_k,
     recall_at_k,
     reciprocal_rank_at_k,
+    rank_candidates_by_scores,
 )
 
 
@@ -144,3 +145,21 @@ def test_reciprocal_rank_fusion_rejects_invalid_rank_constant():
     from app.evaluation import reciprocal_rank_fusion
     with pytest.raises(ValueError):
         reciprocal_rank_fusion([], [], rank_constant=0)
+
+
+def test_cross_encoder_scores_rerank_candidates_and_preserve_metadata():
+    candidates = [
+        {"page_number": 1, "semantic_score": 0.9, "text": "First"},
+        {"page_number": 2, "semantic_score": 0.8, "text": "Second"},
+    ]
+    ranked = rank_candidates_by_scores(candidates, [-1.2, 2.4])
+    assert [item["page_number"] for item in ranked] == [2, 1]
+    assert ranked[0]["reranker_score"] == 2.4
+    assert ranked[0]["text"] == "Second"
+
+
+def test_cross_encoder_rejects_mismatched_or_non_finite_scores():
+    with pytest.raises(ValueError):
+        rank_candidates_by_scores([{"page_number": 1}], [])
+    with pytest.raises(ValueError):
+        rank_candidates_by_scores([{"page_number": 1}], [float("nan")])
