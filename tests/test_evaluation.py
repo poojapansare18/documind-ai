@@ -52,7 +52,7 @@ def test_evaluation_rejects_invalid_k_and_empty_cases():
 
 
 def test_synthetic_benchmark_corpus_has_twelve_ground_truth_pages(tmp_path):
-    import fitz
+    import pymupdf as fitz
 
     from scripts.create_evaluation_corpus import PAGES, create_corpus
 
