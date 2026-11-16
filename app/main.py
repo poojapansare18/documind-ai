@@ -11,7 +11,7 @@ from contextlib import closing
 from pathlib import Path
 from typing import Annotated
 
-import fitz
+import pymupdf as fitz
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse
@@ -824,11 +824,6 @@ def lexical_bm25_scores(query: str, documents: list[str]) -> list[float]:
     average_length = sum(len(tokens) for tokens in document_terms) / document_count
     average_length = max(average_length, 1.0)
     frequencies = [Counter(tokens) for tokens in document_terms]
-    document_frequency = Counter(
-        term for term in set(query_terms)
-        for _ in [0]
-        if any(term in counts for counts in frequencies)
-    )
     # Count each query term once per document for inverse-document frequency.
     document_frequency = {
         term: sum(1 for counts in frequencies if counts.get(term, 0) > 0)
