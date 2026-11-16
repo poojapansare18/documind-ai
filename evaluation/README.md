@@ -1,6 +1,6 @@
 # DocuMind retrieval benchmark
 
-This benchmark measures semantic retrieval at the **page level** using a synthetic, 12-page corporate travel policy and 24 manually authored questions. Each question has one known relevant page. The additional pages provide distractors, so a correct top result is no longer guaranteed by retrieving the entire three-page corpus.
+This benchmark measures hybrid retrieval at the **page level** using a synthetic, 12-page corporate travel policy and 24 manually authored questions. Each question has one known relevant page. The additional pages provide distractors, so a correct top result is no longer guaranteed by retrieving the entire three-page corpus.
 
 ## Run the benchmark
 
@@ -22,6 +22,8 @@ This benchmark measures semantic retrieval at the **page level** using a synthet
    ```powershell
    python scripts/evaluate_retrieval.py --k 1 --report evaluation/results-k1.json
    ```
+
+The semantic score is cosine similarity from the configured FastEmbed model. The lexical score is BM25, calculated over indexed chunks. The API combines 75% semantic score with 25% normalised BM25 score; the response exposes the combined score plus both component scores. This is a fixed baseline weighting, not a learned re-ranker.
 
 The runner creates the synthetic PDF if it does not exist, uploads it if it is not already in the document library, indexes its chunks, runs the benchmark queries against semantic search, and writes a JSON report. The corpus uses a versioned filename so an older three-page benchmark document in a local database is not accidentally reused. The first indexing run downloads the local embedding model. If API-key authentication is enabled, set `DOCUMIND_API_KEY` in the environment or in the root `.env` file.
 
