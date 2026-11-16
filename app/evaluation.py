@@ -74,3 +74,41 @@ def evaluate_retrieval(cases: list[dict], k: int = 5) -> dict:
         },
         "per_query": per_query,
     }
+
+
+def build_retrieval_diagnostics(
+    query: str,
+    ranked_results: list[dict],
+    relevant_pages: list[int | str],
+) -> dict:
+    """Return inspectable ranking evidence for one page-level retrieval query."""
+    relevant = {str(page) for page in relevant_pages}
+    ranked = [
+        {
+            "rank": rank,
+            "page_number": str(item["page_number"]),
+            "chunk_index": item["chunk_index"],
+            "score": round(float(item["score"]), 6),
+            "text_preview": str(item["text"])[:360],
+        }
+        for rank, item in enumerate(ranked_results, start=1)
+    ]
+    relevant_result = next(
+        (item for item in ranked if item["page_number"] in relevant),
+        None,
+    )
+    top_score = ranked[0]["score"] if ranked else None
+    relevant_score = relevant_result["score"] if relevant_result else None
+    return {
+        "query": query,
+        "relevant_pages": sorted(relevant),
+        "ranked_results": ranked,
+        "relevant_rank": relevant_result["rank"] if relevant_result else None,
+        "top_score": top_score,
+        "relevant_score": relevant_score,
+        "top_to_relevant_score_gap": (
+            round(top_score - relevant_score, 6)
+            if top_score is not None and relevant_score is not None
+            else None
+        ),
+    }
