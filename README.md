@@ -21,6 +21,7 @@ A document-intelligence API and lightweight web interface that accepts text-base
 - Cross-page table continuation links when adjacent page geometry and column counts match
 - Persisted, overlapping page-aware text chunks with exact character offsets
 - Local dense embeddings using FastEmbed and the BAAI/bge-small-en-v1.5 model
+- Hybrid retrieval that combines dense cosine similarity with BM25 lexical relevance
 - Explicit document indexing and semantic search with page-level provenance
 - Grounded RAG answers with source labels and page-level citations
 - Layout inspection endpoint for page-by-page text blocks
@@ -47,8 +48,11 @@ flowchart TD
     I --> J[Chunk retrieval with page and character offsets]
     J --> K[Local embedding generation]
     K --> L[SQLite vector store]
-    L --> M[Cosine similarity search]
-    M --> O[Grounded answer generation]
+    L --> M[Dense cosine similarity]
+    J --> N[BM25 lexical scoring]
+    M --> R[Hybrid score fusion]
+    N --> R
+    R --> O[Grounded answer generation]
     O --> P[OpenAI Responses API]
     E --> N[List / delete documents]
 ```
@@ -120,7 +124,7 @@ Text is split independently on each page into chunks of up to 1,200 characters w
 
 Chunking is a deterministic preprocessing step. Semantic indexing uses FastEmbed's local ONNX runtime with `BAAI/bge-small-en-v1.5` (384 dimensions by default). The first indexing request downloads the model; subsequent requests reuse the local cache. No hosted embedding API key is required. See the [FastEmbed quickstart](https://qdrant.github.io/fastembed/Getting%20Started/) for model and runtime details.
 
-To index a document, call `POST /documents/{document_id}/index`. Then call `POST /documents/semantic-search` with a query. Search results include the source document, page, chunk index, character offsets, and cosine-similarity score. The current vector store is SQLite JSON plus an in-process cosine scan. This is appropriate for a small portfolio MVP, not for large-scale production retrieval; a dedicated vector database can replace it later.
+To index a document, call `POST /documents/{document_id}/index`. Then call `POST /documents/semantic-search` with a query. Search results include the source document, page, chunk index, character offsets, the dense semantic score, the BM25 lexical score, and a hybrid score. The hybrid score is 75% cosine similarity and 25% normalised BM25 relevance. The current vector store is SQLite JSON plus an in-process cosine scan; BM25 is also calculated in-process over the compatible indexed chunks. This is appropriate for a small portfolio MVP, not for large-scale production retrieval; a dedicated vector database can replace it later.
 
 ## Grounded question answering
 
