@@ -6,6 +6,8 @@ from app.evaluation import (
     precision_at_k,
     recall_at_k,
     reciprocal_rank_at_k,
+    rank_candidates_by_scores,
+    rerank_top_n_candidates,
 )
 
 
@@ -144,3 +146,40 @@ def test_reciprocal_rank_fusion_rejects_invalid_rank_constant():
     from app.evaluation import reciprocal_rank_fusion
     with pytest.raises(ValueError):
         reciprocal_rank_fusion([], [], rank_constant=0)
+
+
+def test_cross_encoder_scores_rerank_candidates_and_preserve_metadata():
+    candidates = [
+        {"page_number": 1, "semantic_score": 0.9, "text": "First"},
+        {"page_number": 2, "semantic_score": 0.8, "text": "Second"},
+    ]
+    ranked = rank_candidates_by_scores(candidates, [-1.2, 2.4])
+    assert [item["page_number"] for item in ranked] == [2, 1]
+    assert ranked[0]["reranker_score"] == 2.4
+    assert ranked[0]["text"] == "Second"
+
+
+def test_cross_encoder_rejects_mismatched_or_non_finite_scores():
+    with pytest.raises(ValueError):
+        rank_candidates_by_scores([{"page_number": 1}], [])
+    with pytest.raises(ValueError):
+        rank_candidates_by_scores([{"page_number": 1}], [float("nan")])
+
+
+def test_bounded_cross_encoder_reranks_only_semantic_top_n():
+    candidates = [
+        {"page_number": 1, "semantic_score": 0.9},
+        {"page_number": 2, "semantic_score": 0.8},
+        {"page_number": 3, "semantic_score": 0.7},
+        {"page_number": 4, "semantic_score": 0.6},
+    ]
+    ranked = rerank_top_n_candidates(candidates, [0.1, 0.9, 0.5, 10.0], top_n=3)
+    assert [item["page_number"] for item in ranked] == [2, 3, 1, 4]
+    assert "reranker_score" not in ranked[-1]
+
+
+def test_bounded_cross_encoder_rejects_invalid_top_n_or_score_count():
+    with pytest.raises(ValueError):
+        rerank_top_n_candidates([{"page_number": 1}], [0.5], top_n=0)
+    with pytest.raises(ValueError):
+        rerank_top_n_candidates([{"page_number": 1}], [], top_n=1)
