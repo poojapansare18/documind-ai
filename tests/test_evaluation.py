@@ -100,3 +100,23 @@ def test_retrieval_diagnostics_report_missing_relevant_page():
     assert report["relevant_rank"] is None
     assert report["relevant_score"] is None
     assert report["top_to_relevant_score_gap"] is None
+
+
+
+def test_retrieval_diagnostics_include_hybrid_component_scores():
+    from app.evaluation import build_retrieval_diagnostics
+
+    diagnostics = build_retrieval_diagnostics(
+        query="invoice deadline",
+        ranked_results=[{
+            "page_number": 5,
+            "chunk_index": 0,
+            "score": 0.7,
+            "semantic_score": 0.8,
+            "lexical_score": 2.5,
+            "text": "Invoice submission deadline is ten days.",
+        }],
+        relevant_pages=[5],
+    )
+    assert diagnostics["ranked_results"][0]["semantic_score"] == 0.8
+    assert diagnostics["ranked_results"][0]["lexical_score"] == 2.5
