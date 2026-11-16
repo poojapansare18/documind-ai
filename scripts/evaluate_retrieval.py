@@ -68,7 +68,7 @@ def run_benchmark(base_url: str, benchmark_path: Path, k: int | None = None) -> 
             def page_order(items: list[dict]) -> list[str]:
                 return list(dict.fromkeys(str(item["page_number"]) for item in items))
 
-            semantic_results = sorted(results, key=lambda item: (item["semantic_score"], item["lexical_score"]), reverse=True)
+            semantic_results = sorted(results, key=lambda item: item["semantic_score"], reverse=True)
             lexical_results = sorted(results, key=lambda item: (item["lexical_score"], item["semantic_score"]), reverse=True)
             rrf_results = reciprocal_rank_fusion(semantic_results, lexical_results)
             semantic_pages = page_order(semantic_results)
