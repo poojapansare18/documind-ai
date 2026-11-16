@@ -89,6 +89,8 @@ def build_retrieval_diagnostics(
             "page_number": str(item["page_number"]),
             "chunk_index": item["chunk_index"],
             "score": round(float(item["score"]), 6),
+            "semantic_score": round(float(item.get("semantic_score", item["score"])), 6),
+            "lexical_score": round(float(item.get("lexical_score", 0.0)), 6),
             "text_preview": str(item["text"])[:360],
         }
         for rank, item in enumerate(ranked_results, start=1)
