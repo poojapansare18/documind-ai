@@ -130,9 +130,9 @@ For `claim-required-evidence`, the relevant page was initially at semantic rank 
 
 ## Real-document benchmark v4 (NIST SP 800-53 Rev. 5.1)
 
-v4 adds a reproducible real-source retrieval benchmark using 11 selected pages from the NIST-hosted **SP 800-53 Revision 5.1 controls-only PDF derivative** and 22 manually authored questions. It covers Access Control, Audit and Accountability, Configuration Management, Contingency Planning, Identification and Authentication, Incident Response, and System and Communications Protection.
+v4 adds a reproducible real-source retrieval benchmark using 16 selected pages from the NIST-hosted **SP 800-53 Revision 5.1 controls-only PDF derivative** and 22 manually authored questions. It covers Access Control, Audit and Accountability, Configuration Management, Contingency Planning, Identification and Authentication, Incident Response, and System and Communications Protection.
 
-The official source PDF is downloaded on first run by `scripts/create_real_document_corpus.py`. The script extracts original PDF pages 19, 24, 39, 69, 82, 100, 131, 143, 158, 163, and 313 into an 11-page evaluation corpus. The benchmark maps compact output pages 1–11 back to those original source PDF pages in `corpus_profile.output_page_mapping`.
+The official source PDF is downloaded on first run by `scripts/create_real_document_corpus.py`. The script extracts original PDF pages 19, 22, 24, 39, 69, 70, 82, 100, 101, 131, 143, 146, 158, 159, 163, and 313 into a 16-page evaluation corpus. The benchmark maps compact output pages 1–16 back to those original source PDF pages in `corpus_profile.output_page_mapping`.
 
 Official source: [NIST SP 800-53 Downloads](https://csrc.nist.gov/projects/risk-management/sp800-53-controls/downloads). The selected PDF is a derivative controls catalogue containing controls and enhancements only; it is not the complete normative publication and omits broader background and implementation guidance. Refer to the normative NIST publication for authoritative interpretation.
 
@@ -148,4 +148,4 @@ Run the cross-encoder comparison and bounded top-5 experiment:
 python scripts/evaluate_retrieval.py --benchmark evaluation/benchmark_v4.json --k 3 --reranker-model Xenova/ms-marco-MiniLM-L-6-v2 --reranker-top-n 5 --report evaluation/v4-reranker-top5-k3.json
 ```
 
-The benchmark is real-source but intentionally small and selected-page: 11 pages from one publication, with 22 queries (two per selected page). The labels are draft and pending independent review. This is not a representative multi-document benchmark, and results must not be presented as industry-wide or production performance. It does not evaluate answer factuality, citation entailment, OCR quality, table reconstruction, or retrieval over the complete 396-page source.
+The benchmark is real-source but intentionally small and selected-page: 16 selected pages from one publication, with 22 queries (one or two per selected page). The labels are draft and pending independent review. This is not a representative multi-document benchmark, and results must not be presented as industry-wide or production performance. It does not evaluate answer factuality, citation entailment, OCR quality, table reconstruction, or retrieval over the complete 396-page source.
