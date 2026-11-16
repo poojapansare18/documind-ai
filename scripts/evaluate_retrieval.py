@@ -21,6 +21,7 @@ from app.evaluation import (
     reciprocal_rank_fusion,
 )
 from scripts.create_evaluation_corpus import create_corpus, create_diverse_corpus
+from scripts.create_real_document_corpus import create_real_nist_corpus
 
 
 def run_benchmark(
@@ -35,7 +36,9 @@ def run_benchmark(
     corpus_path = benchmark_path.parent / benchmark["corpus_path"]
     if not corpus_path.exists():
         generator = benchmark.get("corpus_generator", "create_corpus")
-        if generator == "create_diverse_corpus":
+        if generator == "create_real_nist_corpus":
+            create_real_nist_corpus(corpus_path)
+        elif generator == "create_diverse_corpus":
             create_diverse_corpus(corpus_path)
         elif generator == "create_corpus":
             create_corpus(corpus_path)
