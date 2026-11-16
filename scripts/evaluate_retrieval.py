@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 load_dotenv(ROOT / ".env")
 
-from app.evaluation import build_retrieval_diagnostics, evaluate_retrieval
+from app.evaluation import build_retrieval_diagnostics, evaluate_retrieval, reciprocal_rank_fusion
 from scripts.create_evaluation_corpus import create_corpus
 
 
@@ -52,29 +52,74 @@ def run_benchmark(base_url: str, benchmark_path: Path, k: int | None = None) -> 
         index_response.raise_for_status()
         index_result = index_response.json()
 
-        cases = []
         diagnostics = []
+        semantic_cases = []
+        lexical_cases = []
+        rrf_cases = []
         for query in benchmark["queries"]:
             response = client.post(
                 "/documents/semantic-search",
-                json={"query": query["query"], "limit": top_k, "document_id": document_id},
+                json={"query": query["query"], "limit": 20, "document_id": document_id},
                 headers=headers,
             )
             response.raise_for_status()
             results = response.json()
-            ranked_pages = list(dict.fromkeys(str(item["page_number"]) for item in results))
-            cases.append({
+
+            def page_order(items: list[dict]) -> list[str]:
+                return list(dict.fromkeys(str(item["page_number"]) for item in items))
+
+            semantic_results = sorted(results, key=lambda item: item["semantic_score"], reverse=True)
+            lexical_results = sorted(results, key=lambda item: (item["lexical_score"], item["semantic_score"]), reverse=True)
+            rrf_results = reciprocal_rank_fusion(semantic_results, lexical_results)
+            semantic_pages = page_order(semantic_results)
+            lexical_pages = page_order(lexical_results)
+            rrf_pages = page_order(rrf_results)
+            relevant = [str(page) for page in query["relevant_pages"]]
+            semantic_cases.append({
                 "id": query["id"],
-                "retrieved": ranked_pages,
-                "relevant": [str(page) for page in query["relevant_pages"]],
+                "retrieved": semantic_pages[:top_k],
+                "relevant": relevant,
             })
-            diagnostics.append(build_retrieval_diagnostics(
+            lexical_cases.append({
+                "id": query["id"],
+                "retrieved": lexical_pages[:top_k],
+                "relevant": relevant,
+            })
+            rrf_cases.append({
+                "id": query["id"],
+                "retrieved": rrf_pages[:top_k],
+                "relevant": relevant,
+            })
+            diagnostic = build_retrieval_diagnostics(
                 query=query["query"],
                 ranked_results=results,
                 relevant_pages=query["relevant_pages"],
-            ))
+            )
+            relevant_set = set(relevant)
+            semantic_ranked = semantic_pages
+            lexical_ranked = lexical_pages
+            diagnostic["semantic_relevant_rank"] = next(
+                (i for i, page in enumerate(semantic_ranked, 1) if page in relevant_set), None
+            )
+            diagnostic["lexical_relevant_rank"] = next(
+                (i for i, page in enumerate(lexical_ranked, 1) if page in relevant_set), None
+            )
+            diagnostic["semantic_top_pages"] = semantic_ranked[:top_k]
+            diagnostic["lexical_top_pages"] = lexical_ranked[:top_k]
+            diagnostic["rrf_relevant_rank"] = next((i for i, page in enumerate(rrf_pages, 1) if page in relevant_set), None)
+            diagnostic["rrf_top_pages"] = rrf_pages[:top_k]
+            diagnostic["rrf_ranked_candidates"] = [
+                {"page_number": item["page_number"], "chunk_index": item["chunk_index"], "rrf_score": round(item["rrf_score"], 8)}
+                for item in rrf_results
+            ]
+            diagnostics.append(diagnostic)
 
-    report = evaluate_retrieval(cases, top_k)
+    report = evaluate_retrieval(semantic_cases, top_k)
+    report["ranking_comparison"] = {
+        "semantic_only": report["metrics"],
+        "lexical_only": evaluate_retrieval(lexical_cases, top_k)["metrics"],
+        "rrf": evaluate_retrieval(rrf_cases, top_k)["metrics"],
+    }
     for metric_row, diagnostic in zip(report["per_query"], diagnostics):
         metric_row.update(diagnostic)
     report["benchmark_name"] = benchmark["benchmark_name"]
@@ -90,7 +135,7 @@ def run_benchmark(base_url: str, benchmark_path: Path, k: int | None = None) -> 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Evaluate DocuMind semantic retrieval against a page-level ground-truth benchmark."
+        description="Evaluate DocuMind retrieval ranking variants against a page-level ground-truth benchmark."
     )
     parser.add_argument("--base-url", default="http://127.0.0.1:8000")
     parser.add_argument(

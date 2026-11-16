@@ -89,6 +89,8 @@ def build_retrieval_diagnostics(
             "page_number": str(item["page_number"]),
             "chunk_index": item["chunk_index"],
             "score": round(float(item["score"]), 6),
+            "semantic_score": round(float(item.get("semantic_score", item["score"])), 6),
+            "lexical_score": round(float(item.get("lexical_score", 0.0)), 6),
             "text_preview": str(item["text"])[:360],
         }
         for rank, item in enumerate(ranked_results, start=1)
@@ -112,3 +114,22 @@ def build_retrieval_diagnostics(
             else None
         ),
     }
+
+
+def reciprocal_rank_fusion(
+    semantic_ranked: list[dict],
+    lexical_ranked: list[dict],
+    rank_constant: int = 60,
+) -> list[dict]:
+    """Fuse ranked candidates without comparing incompatible score scales."""
+    if rank_constant < 1:
+        raise ValueError("rank_constant must be at least 1.")
+    fused: dict[tuple, dict] = {}
+    for rank, item in enumerate(semantic_ranked, start=1):
+        key = (item["document_id"], item["page_number"], item["chunk_index"])
+        fused[key] = {**item, "rrf_score": 1.0 / (rank_constant + rank)}
+    for rank, item in enumerate(lexical_ranked, start=1):
+        key = (item["document_id"], item["page_number"], item["chunk_index"])
+        candidate = fused.setdefault(key, {**item, "rrf_score": 0.0})
+        candidate["rrf_score"] += 1.0 / (rank_constant + rank)
+    return sorted(fused.values(), key=lambda item: (item["rrf_score"], item.get("semantic_score", 0.0)), reverse=True)

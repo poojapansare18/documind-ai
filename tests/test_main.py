@@ -1,4 +1,4 @@
-import fitz
+import pymupdf as fitz
 from fastapi.testclient import TestClient
 
 import app.main as main
@@ -397,6 +397,8 @@ def test_index_and_semantic_search_return_source_provenance(monkeypatch):
     assert response.json()[0]["filename"] == "invoice.pdf"
     assert response.json()[0]["page_number"] == 1
     assert response.json()[0]["score"] == 1.0
+    assert response.json()[0]["semantic_score"] == 1.0
+    assert response.json()[0]["lexical_score"] > 0
     assert response.json()[0]["embedding_model"] == main.MODEL_NAME
 
 
@@ -963,3 +965,47 @@ def test_invalid_request_id_is_replaced():
     assert response.status_code == 200
     assert response.headers["X-Request-ID"] != "bad request id"
     assert len(response.headers["X-Request-ID"]) == 32
+
+
+
+def test_lexical_bm25_prefers_documents_with_query_terms():
+    scores = main.lexical_bm25_scores(
+        "invoice supplier totals",
+        [
+            "Invoice automation extracts supplier names and totals.",
+            "Gardening requires soil sunlight and regular watering.",
+        ],
+    )
+    assert scores[0] > scores[1]
+    assert scores[0] > 0
+
+
+def test_lexical_bm25_returns_zero_for_queries_without_indexable_terms():
+    assert main.lexical_bm25_scores("the and of", ["A useful document."]) == [0.0]
+
+
+def test_semantic_search_preserves_semantic_only_ranking_by_default(monkeypatch):
+    invoice = client.post(
+        "/documents/upload",
+        files={"file": ("hybrid-invoice.pdf", make_pdf("Invoice automation extracts supplier names and totals."), "application/pdf")},
+    )
+    garden = client.post(
+        "/documents/upload",
+        files={"file": ("hybrid-garden.pdf", make_pdf("Gardening requires soil sunlight and regular watering."), "application/pdf")},
+    )
+    monkeypatch.setattr(main, "embed_passages", lambda texts: [[1.0, 0.0] for _ in texts])
+    monkeypatch.setattr(main, "embed_query", lambda query: [1.0, 0.0])
+
+    assert client.post(f"/documents/{invoice.json()['document_id']}/index").status_code == 200
+    assert client.post(f"/documents/{garden.json()['document_id']}/index").status_code == 200
+    response = client.post(
+        "/documents/semantic-search",
+        json={"query": "invoice supplier totals", "limit": 2},
+    )
+
+    assert response.status_code == 200
+    results = response.json()
+    assert results[0]["filename"] == "hybrid-invoice.pdf"
+    assert results[0]["score"] == results[1]["score"]
+    assert results[0]["semantic_score"] == results[1]["semantic_score"]
+    assert results[0]["lexical_score"] > results[1]["lexical_score"]
