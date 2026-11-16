@@ -17,6 +17,7 @@ from app.evaluation import (
     build_retrieval_diagnostics,
     evaluate_retrieval,
     rank_candidates_by_scores,
+    rerank_top_n_candidates,
     reciprocal_rank_fusion,
 )
 from scripts.create_evaluation_corpus import create_corpus
@@ -27,6 +28,7 @@ def run_benchmark(
     benchmark_path: Path,
     k: int | None = None,
     reranker_model_name: str | None = None,
+    reranker_top_n: int | None = None,
 ) -> dict:
     benchmark = json.loads(benchmark_path.read_text(encoding="utf-8"))
     top_k = int(benchmark.get("k", 5)) if k is None else k
@@ -73,6 +75,7 @@ def run_benchmark(
         lexical_cases = []
         rrf_cases = []
         cross_encoder_cases = []
+        bounded_cross_encoder_cases = []
         for query in benchmark["queries"]:
             response = client.post(
                 "/documents/semantic-search",
@@ -94,6 +97,16 @@ def run_benchmark(
                     reranker.rerank(query["query"], [item["text"] for item in semantic_results])
                 )
                 cross_encoder_results = rank_candidates_by_scores(semantic_results, reranker_scores)
+                if reranker_top_n is not None:
+                    bounded_results = rerank_top_n_candidates(
+                        semantic_results, reranker_scores, reranker_top_n
+                    )
+                    bounded_pages = page_order(bounded_results)
+                    bounded_cross_encoder_cases.append({
+                        "id": query["id"],
+                        "retrieved": bounded_pages[:top_k],
+                        "relevant": [str(page) for page in query["relevant_pages"]],
+                    })
             semantic_pages = page_order(semantic_results)
             lexical_pages = page_order(lexical_results)
             rrf_pages = page_order(rrf_results)
@@ -148,6 +161,13 @@ def run_benchmark(
                     (i for i, page in enumerate(cross_encoder_pages, 1) if page in relevant_set), None
                 )
                 diagnostic["cross_encoder_top_pages"] = cross_encoder_pages[:top_k]
+                if reranker_top_n is not None:
+                    bounded_pages = page_order(bounded_results)
+                    diagnostic["cross_encoder_top_n"] = reranker_top_n
+                    diagnostic["bounded_cross_encoder_relevant_rank"] = next(
+                        (i for i, page in enumerate(bounded_pages, 1) if page in relevant_set), None
+                    )
+                    diagnostic["bounded_cross_encoder_top_pages"] = bounded_pages[:top_k]
                 diagnostic["cross_encoder_ranked_candidates"] = [
                     {
                         "page_number": item["page_number"],
@@ -169,6 +189,11 @@ def run_benchmark(
             cross_encoder_cases, top_k
         )["metrics"]
         report["reranker_model"] = reranker_model_name
+        if reranker_top_n is not None:
+            report["ranking_comparison"][f"cross_encoder_top_{reranker_top_n}"] = evaluate_retrieval(
+                bounded_cross_encoder_cases, top_k
+            )["metrics"]
+            report["reranker_top_n"] = reranker_top_n
     for metric_row, diagnostic in zip(report["per_query"], diagnostics):
         metric_row.update(diagnostic)
     report["benchmark_name"] = benchmark["benchmark_name"]
@@ -198,11 +223,18 @@ def main() -> None:
         default=None,
         help="Optional FastEmbed cross-encoder model; downloads its model on first use.",
     )
+    parser.add_argument(
+        "--reranker-top-n",
+        type=int,
+        default=None,
+        help="Also evaluate reranking only the semantic top-N candidates, preserving the remaining order.",
+    )
     parser.add_argument("--report", type=Path, default=None)
     args = parser.parse_args()
 
     report = run_benchmark(
-        args.base_url, args.benchmark.resolve(), args.k, args.reranker_model
+        args.base_url, args.benchmark.resolve(), args.k, args.reranker_model,
+        args.reranker_top_n,
     )
     rendered = json.dumps(report, indent=2, ensure_ascii=False)
     print(rendered)
