@@ -39,6 +39,23 @@ python scripts/evaluate_retrieval.py --k 3 --reranker-model Xenova/ms-marco-Mini
 
 The optional stage uses FastEmbed's ONNX-based `TextCrossEncoder` to score each query against the candidate texts already retrieved by semantic search. It then ranks those candidates by cross-encoder score and adds a `cross_encoder` row to `ranking_comparison`, plus per-query ranks and candidate scores. Add `--reranker-top-n 3` to also evaluate a bounded variant: only the first three semantic candidates are reordered by cross-encoder score, while all remaining candidates retain their original semantic order. This is an offline safeguard experiment, not an API setting. It does not change the API or its default ranking. The first run downloads the model (approximately 0.08 GB); later runs use the local model cache. See the [FastEmbed reranker guide](https://qdrant.tech/documentation/fastembed/fastembed-rerankers/).
 
+
+## Version 3: multi-domain evaluation pack
+
+Version 3 adds a separate 24-page synthetic policy corpus covering three domains: corporate travel, procurement, and information security. It includes narrative pages, two-column layouts, and table-like policy blocks. The 48 questions contain two paraphrased queries per page, with one page-level relevant label, a supporting evidence excerpt, and a short annotation rationale.
+
+The corpus is generated on demand and does not replace the v2 baseline:
+
+```powershell
+python scripts/evaluate_retrieval.py --benchmark evaluation/benchmark_v3.json --k 3 --report evaluation/v3-semantic-k3.json
+python scripts/evaluate_retrieval.py --benchmark evaluation/benchmark_v3.json --k 1 --report evaluation/v3-semantic-k1.json
+python scripts/evaluate_retrieval.py --benchmark evaluation/benchmark_v3.json --k 3 --reranker-model Xenova/ms-marco-MiniLM-L-6-v2 --reranker-top-n 3 --report evaluation/v3-reranker-top3-k3.json
+```
+
+The v3 labels are **draft gold labels, not independently reviewed labels**. Each query is paired with the page containing its supporting statement, and the JSON includes the evidence excerpt and rationale to make verification practical. Before reporting v3 as an independently labelled evaluation, two reviewers must independently judge the query-page pairs, record disagreements, and adjudicate them. The repository does not claim that this review has happened.
+
+This corpus is still synthetic. It broadens domains and page layouts, but it does not substitute for permission-cleared real PDFs, OCR-heavy scans, complex real-world tables, multi-document retrieval, or answer-level factuality and citation evaluation. The current runner uploads the 24-page pack as one PDF and evaluates page-level retrieval within that document. Treat the results as a stronger internal engineering stress test, not an external benchmark or production guarantee.
+
 ## Metrics
 
 - **Precision@k:** fraction of the top-k returned pages that are relevant.
