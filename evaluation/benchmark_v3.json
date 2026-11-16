@@ -43,7 +43,7 @@
       "relevant_pages": [
         1
       ],
-      "evidence_excerpt": "Standard economy travel should be booked at least 14 calendar days before departure.",
+      "evidence_excerpt": "Any business-class itinerary requires written approval from the employee's executive vice president before ticketing.",
       "annotation_rationale": "Page 1 contains the policy statement needed to answer this question.",
       "review_status": "pending_independent_review"
     },
@@ -63,7 +63,7 @@
       "relevant_pages": [
         2
       ],
-      "evidence_excerpt": "Local journeys must use licensed taxis or the approved mobility provider.",
+      "evidence_excerpt": "Unapproved ride-share services are not reimbursable.",
       "annotation_rationale": "Page 2 contains the policy statement needed to answer this question.",
       "review_status": "pending_independent_review"
     },
@@ -143,7 +143,7 @@
       "relevant_pages": [
         6
       ],
-      "evidence_excerpt": "A claim filed more than 30 calendar days after the trip requires an exception signed by the Finance Director.",
+      "evidence_excerpt": "The line manager cannot approve this exception.",
       "annotation_rationale": "Page 6 contains the policy statement needed to answer this question.",
       "review_status": "pending_independent_review"
     },
@@ -183,7 +183,7 @@
       "relevant_pages": [
         8
       ],
-      "evidence_excerpt": "Convert to INR using the card issuer's posted settlement rate.",
+      "evidence_excerpt": "If the card statement is unavailable, Finance uses the Reserve Bank reference rate for the transaction date.",
       "annotation_rationale": "Page 8 contains the policy statement needed to answer this question.",
       "review_status": "pending_independent_review"
     },
@@ -243,7 +243,7 @@
       "relevant_pages": [
         11
       ],
-      "evidence_excerpt": "Purchases above INR 50,000 require at least three comparable written supplier quotations.",
+      "evidence_excerpt": "If fewer than three suppliers can provide the item, the requester must attach a sole-source justification approved by the procurement director.",
       "annotation_rationale": "Page 11 contains the policy statement needed to answer this question.",
       "review_status": "pending_independent_review"
     },
@@ -253,7 +253,7 @@
       "relevant_pages": [
         12
       ],
-      "evidence_excerpt": "Bank-detail changes require independent callback verification using a previously registered telephone number.",
+      "evidence_excerpt": "Before the first order, Procurement must verify the supplier's tax registration, bank-account proof, legal business name, and signed code of conduct.",
       "annotation_rationale": "Page 12 contains the policy statement needed to answer this question.",
       "review_status": "pending_independent_review"
     },
@@ -283,7 +283,7 @@
       "relevant_pages": [
         13
       ],
-      "evidence_excerpt": "Employees involved in supplier selection must disclose any personal, family, or financial relationship with a bidder before evaluating offers.",
+      "evidence_excerpt": "The employee must withdraw from the evaluation until Compliance records a decision.",
       "annotation_rationale": "Page 13 contains the policy statement needed to answer this question.",
       "review_status": "pending_independent_review"
     },
@@ -303,7 +303,7 @@
       "relevant_pages": [
         14
       ],
-      "evidence_excerpt": "Record shortages or damage in the goods-received note within two business days.",
+      "evidence_excerpt": "Do not confirm receipt for items that have not arrived.",
       "annotation_rationale": "Page 14 contains the policy statement needed to answer this question.",
       "review_status": "pending_independent_review"
     },
@@ -323,7 +323,7 @@
       "relevant_pages": [
         15
       ],
-      "evidence_excerpt": "Accounts Payable releases payment only after a three-way match of the approved purchase order, goods-received note, and supplier invoice.",
+      "evidence_excerpt": "A price or quantity mismatch places the invoice on hold pending buyer resolution.",
       "annotation_rationale": "Page 15 contains the policy statement needed to answer this question.",
       "review_status": "pending_independent_review"
     },
@@ -383,7 +383,7 @@
       "relevant_pages": [
         18
       ],
-      "evidence_excerpt": "Multi-factor authentication is mandatory for remote access, administrator accounts, and systems containing customer or employee personal data.",
+      "evidence_excerpt": "Approved factors are a hardware security key or authenticator application; SMS is not an approved factor.",
       "annotation_rationale": "Page 18 contains the policy statement needed to answer this question.",
       "review_status": "pending_independent_review"
     },
@@ -443,7 +443,7 @@
       "relevant_pages": [
         21
       ],
-      "evidence_excerpt": "Suspected loss of a company device, credential disclosure, malware infection, or accidental data sharing must be reported to the Security Operations Centre within one hour of discovery.",
+      "evidence_excerpt": "Preserve evidence and do not attempt to erase logs.",
       "annotation_rationale": "Page 21 contains the policy statement needed to answer this question.",
       "review_status": "pending_independent_review"
     },
@@ -463,7 +463,7 @@
       "relevant_pages": [
         22
       ],
-      "evidence_excerpt": "Customer support recordings are retained for 180 days unless a legal hold applies.",
+      "evidence_excerpt": "Legal, privacy, or security teams may issue a documented hold that suspends scheduled deletion.",
       "annotation_rationale": "Page 22 contains the policy statement needed to answer this question.",
       "review_status": "pending_independent_review"
     },
@@ -503,7 +503,7 @@
       "relevant_pages": [
         24
       ],
-      "evidence_excerpt": "Critical production databases are backed up every 4 hours.",
+      "evidence_excerpt": "The recovery objective is a maximum 8-hour data-loss window and restoration of service within 12 hours.",
       "annotation_rationale": "Page 24 contains the policy statement needed to answer this question.",
       "review_status": "pending_independent_review"
     }
