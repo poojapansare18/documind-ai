@@ -909,8 +909,6 @@ def semantic_search(request: SemanticSearchRequest) -> list[SemanticSearchResult
             if maximum_lexical_score > 0
             else 0.0
         )
-        # Semantic relevance remains the primary signal; BM25 adds exact-term evidence.
-        hybrid_score = 0.75 * semantic_score + 0.25 * normalised_lexical_score
         results.append(SemanticSearchResult(
             document_id=row["document_id"],
             filename=row["filename"],
@@ -918,7 +916,7 @@ def semantic_search(request: SemanticSearchRequest) -> list[SemanticSearchResult
             chunk_index=row["chunk_index"],
             start_char=row["start_char"],
             end_char=row["end_char"],
-            score=round(hybrid_score, 6),
+            score=round(semantic_score, 6),
             semantic_score=round(semantic_score, 6),
             lexical_score=round(lexical_score, 6),
             text=row["chunk_text"],
@@ -927,7 +925,7 @@ def semantic_search(request: SemanticSearchRequest) -> list[SemanticSearchResult
 
     return sorted(
         results,
-        key=lambda result: (result.score, result.semantic_score),
+        key=lambda result: (result.semantic_score, result.lexical_score),
         reverse=True,
     )[:request.limit]
 
