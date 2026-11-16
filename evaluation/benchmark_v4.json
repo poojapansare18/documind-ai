@@ -1,5 +1,5 @@
 {
-  "benchmark_name": "Real-Document Security Controls Retrieval Benchmark v4 (NIST SP 800-53 Rev. 5.1, 11 source pages, 22 queries)",
+  "benchmark_name": "Real-Document Security Controls Retrieval Benchmark v4 (NIST SP 800-53 Rev. 5.1, 16 selected source pages, 22 queries)",
   "corpus_filename": "documind_nist_sp800_53_v4.pdf",
   "corpus_path": "sample_nist_sp800_53_v4.pdf",
   "corpus_generator": "create_real_nist_corpus",
