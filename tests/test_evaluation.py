@@ -120,3 +120,27 @@ def test_retrieval_diagnostics_include_hybrid_component_scores():
     )
     assert diagnostics["ranked_results"][0]["semantic_score"] == 0.8
     assert diagnostics["ranked_results"][0]["lexical_score"] == 2.5
+
+
+def test_reciprocal_rank_fusion_combines_rank_positions():
+    from app.evaluation import reciprocal_rank_fusion
+
+    semantic = [
+        {"document_id": "d", "page_number": 1, "chunk_index": 0, "semantic_score": 0.9},
+        {"document_id": "d", "page_number": 2, "chunk_index": 0, "semantic_score": 0.8},
+        {"document_id": "d", "page_number": 3, "chunk_index": 0, "semantic_score": 0.7},
+    ]
+    lexical = [
+        {"document_id": "d", "page_number": 3, "chunk_index": 0, "lexical_score": 4.0},
+        {"document_id": "d", "page_number": 1, "chunk_index": 0, "lexical_score": 3.0},
+        {"document_id": "d", "page_number": 2, "chunk_index": 0, "lexical_score": 2.0},
+    ]
+    fused = reciprocal_rank_fusion(semantic, lexical)
+    assert [item["page_number"] for item in fused] == [1, 3, 2]
+    assert fused[0]["rrf_score"] == pytest.approx(1 / 61 + 1 / 62)
+
+
+def test_reciprocal_rank_fusion_rejects_invalid_rank_constant():
+    from app.evaluation import reciprocal_rank_fusion
+    with pytest.raises(ValueError):
+        reciprocal_rank_fusion([], [], rank_constant=0)
