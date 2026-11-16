@@ -78,12 +78,12 @@ def create_diverse_corpus(output_path: Path) -> Path:
         page.insert_text((42, 91), heading, fontsize=16, fontname="hebo")
         if layout == "table":
             lines = body.split(". ")
-            table_text = "\\n".join(f"{line.strip()}." for line in lines if line.strip())
+            table_text = "\n".join(f"{line.strip()}." for line in lines if line.strip())
             page.insert_textbox(fitz.Rect(52, 135, 540, 410), table_text, fontsize=12, fontname="cour", lineheight=1.8)
             page.draw_rect(fitz.Rect(45, 125, 548, 420), color=(0.45, 0.5, 0.6), width=0.7)
         elif index % 3 == 1:
             page.insert_textbox(fitz.Rect(42, 135, 285, 500), body, fontsize=11, fontname="helv", lineheight=1.5)
-            page.insert_textbox(fitz.Rect(310, 135, 550, 500), "CONTROL NOTES\\n\\nThis section is part of the same policy. Apply the stated approval, evidence, and record-keeping requirements together. If an exception is needed, retain the written decision with the transaction record.", fontsize=10, fontname="helv", lineheight=1.5)
+            page.insert_textbox(fitz.Rect(310, 135, 550, 500), "CONTROL NOTES\n\nThis section is part of the same policy. Apply the stated approval, evidence, and record-keeping requirements together. If an exception is needed, retain the written decision with the transaction record.", fontsize=10, fontname="helv", lineheight=1.5)
         else:
             page.insert_textbox(fitz.Rect(48, 140, 545, 530), body, fontsize=12, fontname="helv", lineheight=1.55)
         page.insert_text((42, 790), f"Synthetic evaluation corpus - fictional policy - page {index + 1}", fontsize=8, fontname="helv")
