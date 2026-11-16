@@ -50,9 +50,9 @@ flowchart TD
     K --> L[SQLite vector store]
     L --> M[Dense cosine similarity]
     J --> N[BM25 lexical scoring]
-    M --> U[Hybrid score fusion]
-    N --> U
-    U --> O[Grounded answer generation]
+    M --> O[Grounded answer generation]
+    M --> W[Offline ranking comparison]
+    N --> W
     O --> P[OpenAI Responses API]
     E --> V[List / delete documents]
 ```
