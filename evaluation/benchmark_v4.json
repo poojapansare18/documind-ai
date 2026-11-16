@@ -1,0 +1,289 @@
+{
+  "benchmark_name": "Real-Document Security Controls Retrieval Benchmark v4 (NIST SP 800-53 Rev. 5.1, 11 source pages, 22 queries)",
+  "corpus_filename": "documind_nist_sp800_53_v4.pdf",
+  "corpus_path": "sample_nist_sp800_53_v4.pdf",
+  "corpus_generator": "create_real_nist_corpus",
+  "k": 3,
+  "corpus_profile": {
+    "source_document": "NIST Special Publication 800-53 Revision 5.1, Security and Privacy Controls for Information Systems and Organizations",
+    "source_type": "official public NIST-hosted PDF derivative containing controls and control enhancements",
+    "source_url": "https://csrc.nist.gov/CSRC/media/Projects/risk-management/800-53%20Downloads/800-53r5/SP_800-53_v5_1-derived-OSCAL.pdf",
+    "source_pdf_pages": 396,
+    "selected_source_pdf_pages": [
+      19,
+      24,
+      39,
+      69,
+      82,
+      100,
+      131,
+      143,
+      158,
+      163,
+      313
+    ],
+    "output_page_mapping": {
+      "1": 19,
+      "2": 24,
+      "3": 39,
+      "4": 69,
+      "5": 82,
+      "6": 100,
+      "7": 131,
+      "8": 143,
+      "9": 158,
+      "10": 163,
+      "11": 313
+    },
+    "selected_controls": [
+      "AC-2",
+      "AC-3",
+      "AC-6",
+      "AU-2",
+      "AU-11",
+      "CM-2",
+      "CP-9",
+      "IA-5",
+      "IR-4",
+      "IR-6",
+      "SC-8"
+    ],
+    "layouts": [
+      "original NIST PDF text layout",
+      "control statements",
+      "discussion text",
+      "control enhancement headings"
+    ],
+    "content": "real source material; selected pages from one authoritative publication",
+    "limitation": "This is a selected-page retrieval benchmark, not a full-document or multi-document benchmark. The source PDF is a derivative controls-only version, not the complete normative publication."
+  },
+  "annotation_protocol": {
+    "status": "draft_gold_labels_pending_independent_review",
+    "unit": "page-level relevance",
+    "current_label_basis": "Each query is mapped to the selected source page containing the control statement or enhancement that directly answers it. Original NIST PDF page numbers are preserved in corpus_profile.output_page_mapping.",
+    "required_next_step": "Two reviewers should independently judge every query-page pair against the original NIST source, record disagreements, and adjudicate before production claims.",
+    "limitation": "Labels were authored from the official source and have not been independently reviewed. Queries sharing a control page are not independent document samples."
+  },
+  "queries": [
+    {
+      "id": "ac-2-1",
+      "query": "Which control requires organisations to manage system accounts throughout their lifecycle?",
+      "relevant_pages": [
+        1
+      ],
+      "evidence_excerpt": "AC-2 Account Management",
+      "annotation_rationale": "The selected NIST source page 1 contains the control statement or enhancement needed to answer this query.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "ac-2-2",
+      "query": "Under what circumstances should system accounts be disabled?",
+      "relevant_pages": [
+        1
+      ],
+      "evidence_excerpt": "AC-2 Account Management",
+      "annotation_rationale": "The selected NIST source page 1 contains the control statement or enhancement needed to answer this query.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "ac-3-1",
+      "query": "Which NIST control requires approved logical access authorisations to be enforced?",
+      "relevant_pages": [
+        2
+      ],
+      "evidence_excerpt": "AC-3 Access Enforcement",
+      "annotation_rationale": "The selected NIST source page 2 contains the control statement or enhancement needed to answer this query.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "ac-3-2",
+      "query": "What does NIST call the requirement for two authorised people to approve a privileged action?",
+      "relevant_pages": [
+        2
+      ],
+      "evidence_excerpt": "AC-3(2) Dual Authorization",
+      "annotation_rationale": "The selected NIST source page 2 contains the control statement or enhancement needed to answer this query.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "ac-6-1",
+      "query": "What is the principle that limits users and processes to only the permissions needed for assigned tasks?",
+      "relevant_pages": [
+        3
+      ],
+      "evidence_excerpt": "AC-6 Least Privilege",
+      "annotation_rationale": "The selected NIST source page 3 contains the control statement or enhancement needed to answer this query.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "ac-6-2",
+      "query": "Which control enhancement requires logging the execution of privileged functions?",
+      "relevant_pages": [
+        3
+      ],
+      "evidence_excerpt": "AC-6(9) Log Use of Privileged Functions",
+      "annotation_rationale": "The selected NIST source page 3 contains the control statement or enhancement needed to answer this query.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "au-2-1",
+      "query": "Which control identifies the types of system events that should be logged for auditing?",
+      "relevant_pages": [
+        4
+      ],
+      "evidence_excerpt": "AU-2 Event Logging",
+      "annotation_rationale": "The selected NIST source page 4 contains the control statement or enhancement needed to answer this query.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "au-2-2",
+      "query": "What kinds of activity may be considered significant security events for logging?",
+      "relevant_pages": [
+        4
+      ],
+      "evidence_excerpt": "AU-2 Event Logging discussion",
+      "annotation_rationale": "The selected NIST source page 4 contains the control statement or enhancement needed to answer this query.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "au-11-1",
+      "query": "Which control requires audit records to be kept for an organisation-defined period?",
+      "relevant_pages": [
+        5
+      ],
+      "evidence_excerpt": "AU-11 Audit Record Retention",
+      "annotation_rationale": "The selected NIST source page 5 contains the control statement or enhancement needed to answer this query.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "au-11-2",
+      "query": "What capability helps an organisation read and retrieve audit records stored for many years?",
+      "relevant_pages": [
+        5
+      ],
+      "evidence_excerpt": "AU-11(1) Long-term Retrieval Capability",
+      "annotation_rationale": "The selected NIST source page 5 contains the control statement or enhancement needed to answer this query.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "cm-2-1",
+      "query": "Which control requires a current system baseline configuration to be documented and maintained?",
+      "relevant_pages": [
+        6
+      ],
+      "evidence_excerpt": "CM-2 Baseline Configuration",
+      "annotation_rationale": "The selected NIST source page 6 contains the control statement or enhancement needed to answer this query.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "cm-2-2",
+      "query": "What should an organisation maintain to keep baseline configuration information complete, accurate, and current?",
+      "relevant_pages": [
+        6
+      ],
+      "evidence_excerpt": "CM-2(2) Automation Support for Accuracy and Currency",
+      "annotation_rationale": "The selected NIST source page 6 contains the control statement or enhancement needed to answer this query.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "cp-9-1",
+      "query": "Which control covers creating backups of system information at an organisation-defined frequency?",
+      "relevant_pages": [
+        7
+      ],
+      "evidence_excerpt": "CP-9 System Backup",
+      "annotation_rationale": "The selected NIST source page 7 contains the control statement or enhancement needed to answer this query.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "cp-9-2",
+      "query": "How can an organisation verify that backup media and backed-up information can be reliably retrieved?",
+      "relevant_pages": [
+        7
+      ],
+      "evidence_excerpt": "CP-9(1) Testing for Reliability and Integrity",
+      "annotation_rationale": "The selected NIST source page 7 contains the control statement or enhancement needed to answer this query.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "ia-5-1",
+      "query": "Which control governs the management and initial distribution of system authenticators?",
+      "relevant_pages": [
+        8
+      ],
+      "evidence_excerpt": "IA-5 Authenticator Management",
+      "annotation_rationale": "The selected NIST source page 8 contains the control statement or enhancement needed to answer this query.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "ia-5-2",
+      "query": "What does NIST require to prevent unencrypted static credentials from being embedded in applications?",
+      "relevant_pages": [
+        8
+      ],
+      "evidence_excerpt": "IA-5(7) No Embedded Unencrypted Static Authenticators",
+      "annotation_rationale": "The selected NIST source page 8 contains the control statement or enhancement needed to answer this query.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "ir-4-1",
+      "query": "Which control establishes the organisation's capability to handle information security incidents?",
+      "relevant_pages": [
+        9
+      ],
+      "evidence_excerpt": "IR-4 Incident Handling",
+      "annotation_rationale": "The selected NIST source page 9 contains the control statement or enhancement needed to answer this query.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "ir-4-2",
+      "query": "Which incident-handling enhancement combines incident information from different sources for organisation-wide awareness?",
+      "relevant_pages": [
+        9
+      ],
+      "evidence_excerpt": "IR-4(4) Information Correlation",
+      "annotation_rationale": "The selected NIST source page 9 contains the control statement or enhancement needed to answer this query.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "ir-6-1",
+      "query": "Which control requires personnel to report suspected information security incidents?",
+      "relevant_pages": [
+        10
+      ],
+      "evidence_excerpt": "IR-6 Incident Reporting",
+      "annotation_rationale": "The selected NIST source page 10 contains the control statement or enhancement needed to answer this query.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "ir-6-2",
+      "query": "What enhancement allows incidents to be reported through automated mechanisms?",
+      "relevant_pages": [
+        10
+      ],
+      "evidence_excerpt": "IR-6(1) Automated Reporting",
+      "annotation_rationale": "The selected NIST source page 10 contains the control statement or enhancement needed to answer this query.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "sc-8-1",
+      "query": "Which control protects the confidentiality or integrity of information while it is being transmitted?",
+      "relevant_pages": [
+        11
+      ],
+      "evidence_excerpt": "SC-8 Transmission Confidentiality and Integrity",
+      "annotation_rationale": "The selected NIST source page 11 contains the control statement or enhancement needed to answer this query.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "id": "sc-8-2",
+      "query": "Which cryptographic mechanisms does NIST identify as ways to protect information during transmission?",
+      "relevant_pages": [
+        11
+      ],
+      "evidence_excerpt": "SC-8(1) Cryptographic Protection",
+      "annotation_rationale": "The selected NIST source page 11 contains the control statement or enhancement needed to answer this query.",
+      "review_status": "pending_independent_review"
+    }
+  ]
+}
